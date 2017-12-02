@@ -3,8 +3,8 @@ package io.ticofab.akkaclusterkubernetes.actor
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-import akka.Done
 import akka.actor.Actor
+import io.ticofab.akkaclusterkubernetes.actor.Master.JobDone
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -17,8 +17,17 @@ class Worker extends Actor {
     case s: String =>
       println(s"${self.path.name}, ${LocalDateTime.now.format(DateTimeFormatter.ISO_LOCAL_TIME)}, $s")
       val originalSender = sender
-      Future(Thread.sleep(2000)).onComplete(_ => originalSender ! Done)
+      val tb = System.currentTimeMillis
+      doWork(s).onComplete(_ => {
+        val et = System.currentTimeMillis - tb
+        println(s"${self.path.name}, evaluated task in $et milliseconds.")
+        originalSender ! JobDone(s)
+      })
+  }
 
-    //context.system.scheduler.scheduleOnce(2.seconds, originalSender, Done)
+  def doWork(s: String) = Future {
+    val repetition = 500000000
+    (1 to repetition).foreach(i => i + s.length * 50)
+    Thread.sleep(2000)
   }
 }

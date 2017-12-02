@@ -1,15 +1,14 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
-import java.time.LocalDateTime
-
-import akka.Done
 import akka.actor.{Actor, Props}
 import akka.cluster.routing.{ClusterRouterPool, ClusterRouterPoolSettings}
 import akka.pattern.ask
 import akka.routing.RoundRobinPool
+import akka.stream.ActorAttributes.supervisionStrategy
+import akka.stream.Supervision.resumingDecider
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, ActorMaterializerSettings, OverflowStrategy, Supervision}
-import io.ticofab.akkaclusterkubernetes.actor.Master.EvaluateRate
+import io.ticofab.akkaclusterkubernetes.actor.Master.{EvaluateRate, JobDone}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -18,6 +17,7 @@ class Master extends Actor {
   implicit val as = context.system
   val settings = ActorMaterializerSettings(as).withSupervisionStrategy(_ => Supervision.Restart)
   implicit val am = ActorMaterializer()
+
 
   println(s"creating master ${self.path.name}")
 
@@ -28,47 +28,47 @@ class Master extends Actor {
       ClusterRouterPoolSettings(
         totalInstances = 100,
         maxInstancesPerNode = 1,
-        allowLocalRoutees = true)
+        allowLocalRoutees = false)
     ).props(Props[Worker]),
     name = "workerRouter")
 
   // state to evaluate rate of message processing
-  var inputTimestamps: List[LocalDateTime] = List()
-  var doneTimestamps: List[LocalDateTime] = List()
-  context.system.scheduler.schedule(0.seconds, 10.seconds, self, EvaluateRate)
+  var enqueuedJobs: scala.collection.mutable.Set[String] = scala.collection.mutable.Set()
+  var completedJobs: scala.collection.mutable.Set[String] = scala.collection.mutable.Set()
 
-  val processingQueue = Source.queue[String](100, OverflowStrategy.dropTail)
-    .mapAsyncUnordered(10)(msg => (workerRouter ? msg) (5.seconds).mapTo[Done])
-    .recover { case t: Throwable =>
-      println(t.getMessage)
-      Done
-    }.toMat(Sink.foreach { _ =>
-      // update the timestamps log of the acknowledgements
-      doneTimestamps = LocalDateTime.now :: doneTimestamps
-    })(Keep.left)
+  context.system.scheduler.schedule(10.seconds, 10.seconds, self, EvaluateRate)
+
+  val processingQueue = Source.queue[String](100, OverflowStrategy.backpressure)
+    .mapAsync(2)(msg => (workerRouter ? msg) (3.seconds).mapTo[JobDone])
+    .withAttributes(supervisionStrategy(resumingDecider))
+    .toMat(Sink.foreach(jobDone => if (enqueuedJobs.contains(jobDone.s)) {
+      println(s"${self.path.name}, adding ${jobDone.s} to the completed jobs.")
+      completedJobs += jobDone.s
+    }))(Keep.left)
     .run()
 
   override def receive = {
     case s: String =>
-      // update input messages timestamps log
-      inputTimestamps = LocalDateTime.now :: inputTimestamps
 
       // enqueue for processing
-      processingQueue offer s foreach println
+      processingQueue offer s foreach (_ => {
+        println(s"${self.path.name}, adding $s to the enqueued jobs.")
+        enqueuedJobs += s
+      })
 
     case EvaluateRate =>
-      val oneMinuteAgo = LocalDateTime.now minusMinutes 1
-      inputTimestamps = inputTimestamps filter (_ isAfter oneMinuteAgo)
-      doneTimestamps = doneTimestamps filter (_ isAfter oneMinuteAgo)
-      val rate: Double =
-        if (inputTimestamps.isEmpty || doneTimestamps.isEmpty) 0.0
-        else inputTimestamps.length.toDouble / doneTimestamps.length.toDouble
-      println(s"${self.path.name}, evaluated rate: ${inputTimestamps.length} / ${doneTimestamps.length} ===> $rate")
+      val percentCompleted = completedJobs.size.toDouble / enqueuedJobs.size.toDouble * 100
+      println(s"${self.path.name}, enqueuedJobs: ${enqueuedJobs.size}, completed jobs: ${completedJobs.size}")
+      println(s"${self.path.name}, over the last 10 seconds, the percentage of completed jobs is $percentCompleted %")
+      enqueuedJobs.clear()
+      completedJobs.clear()
   }
 }
 
 object Master {
 
   case object EvaluateRate
+
+  case class JobDone(s: String)
 
 }
