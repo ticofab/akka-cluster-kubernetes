@@ -12,7 +12,7 @@ class Supervisor extends Actor {
   }
 
   // create mast and input source actors
-  val master = context.actorOf(Props[Master], "master")
+  val master = context.actorOf(Props[RateChecker], "master")
   context.actorOf(Props(new InputSource(master)), "inputSource")
 
   override def receive = Actor.emptyBehavior
