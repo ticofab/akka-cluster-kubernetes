@@ -1,15 +1,12 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.actor.Actor
-import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream._
-import akka.stream.scaladsl.{Keep, Sink, Source}
-import io.ticofab.akkaclusterkubernetes.actor.RateChecker.EvaluateRate
-import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Complete, Init}
+import io.ticofab.akkaclusterkubernetes.actor.RateChecker.{EvaluateRate, Init}
+import io.ticofab.akkaclusterkubernetes.actor.Router.Ack
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
 class RateChecker extends Actor {
   implicit val as = context.system
@@ -21,53 +18,46 @@ class RateChecker extends Actor {
   // the router
   val workerRouter = context.actorOf(Router(), "router")
 
+  // the jobs to execute
+  var jobs: List[String] = List()
+
   // state to evaluate rate of message processing
-  var enqueuedJobs = 0
-  var droppedJobs = 0
   var completedJobs = 0
 
   context.system.scheduler.schedule(10.seconds, 10.seconds, self, EvaluateRate)
 
-  val processingQueue = Source.queue[String](5, OverflowStrategy.dropNew)
-    .toMat(Sink.actorRefWithAck(workerRouter, Init, Ack, Complete))(Keep.left)
-    .mapMaterializedValue { f =>
-      println("yo")
-      f
-    }
-    .run()
-
   override def receive = {
     case s: String =>
+      println("received job: " + s)
+      jobs = s :: jobs
 
-      // enqueue for processing
-      processingQueue offer s onComplete {
-        case Success(qor) => qor match {
-          case Enqueued =>
-            println("job enqueued: " + s)
-            enqueuedJobs += 1
+    case Init =>
+      // son is ready!
+      println("son is ready")
+      workerRouter ! jobs.head
+      jobs = jobs.tail
 
-          case Dropped =>
-            println("job dropped: " + s)
-            droppedJobs += 1
-
-          case QueueClosed => println("queue closed")
-          case QueueOfferResult.Failure(error) => println("error " + error.getMessage)
-        }
-        case Failure(error) => println("error " + error.getMessage)
-      }
+    case Ack =>
+      // we can send another one!
+      completedJobs += 1
+      workerRouter ! jobs.head
+      jobs = jobs.tail
 
     case EvaluateRate =>
       val rate = completedJobs match {
         case 0 => 0.0
-        case x => (enqueuedJobs + droppedJobs).toDouble / x
+        case x => jobs.size.toDouble / x.toDouble
       }
-      println(s"${self.path.name}, rate = $rate")
+      // TODO: this isn't a real rate
+      println(s"${self.path.name}, jobs to do: ${jobs.size}, completed: $completedJobs, rate = $rate")
   }
 }
 
 object RateChecker {
 
   case object EvaluateRate
+
+  case object Init
 
 }
 

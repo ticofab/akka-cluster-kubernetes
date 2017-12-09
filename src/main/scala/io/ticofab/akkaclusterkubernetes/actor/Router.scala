@@ -7,11 +7,12 @@ import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, Unreachab
 import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
 import akka.pattern.ask
 import akka.routing.RoundRobinGroup
-import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, JobResult}
+import io.ticofab.akkaclusterkubernetes.actor.RateChecker.Init
+import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, JobResult}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class Router extends Actor {
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
@@ -30,13 +31,9 @@ class Router extends Actor {
   override def receive = empty
 
   def empty: Receive = {
-    case Init =>
-      println("received init")
-      myUser = Some(sender)
-
     case MemberUp(m) =>
       println("the first member joined: " + m.address.toString)
-      myUser.foreach(_ ! Ack)
+      context.parent ! Init
       context become ready(1)
 
     case s: String => // do nothing
@@ -48,11 +45,12 @@ class Router extends Actor {
     case s: String =>
       val ackRecipient = sender
       (workerRouter ? s) (3.seconds).mapTo[JobResult].onComplete {
-      case Success(jobResult) => jobResult.outcome match {
-        case Some(done) => ackRecipient ! Ack
-        case None => // agh!
+        case Success(jobResult) => jobResult.outcome match {
+          case Some(done) => ackRecipient ! Ack
+          case None => // agh!
+        }
+        case Failure(error) => // agh!
       }
-    }
   }
 }
 
@@ -60,8 +58,6 @@ object Router {
   def apply(): Props = Props(new Router)
 
   case class JobResult(outcome: Option[Done])
-
-  case object Init
 
   case object Ack
 
