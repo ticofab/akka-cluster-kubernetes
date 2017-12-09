@@ -13,6 +13,9 @@ object AkkaClusterKubernetesApp extends App {
   val roles = ConfigFactory.load().getStringList("akka.cluster.roles")
   if (roles.contains("seed")) {
     as.actorOf(Props(new Supervisor), "supervisor")
+    // test server to check if this guy is alive
+    implicit val am = ActorMaterializer()
+    Http().bindAndHandle(get(complete("ACK is alive!")), "0.0.0.0", 8080)
   }
 
 
@@ -37,10 +40,5 @@ object AkkaClusterKubernetesApp extends App {
 
 
    */
-
-
-  // test server to check if this guy is alive
-  implicit val am = ActorMaterializer()
-  Http().bindAndHandle(get(complete("ACK is alive!")), "0.0.0.0", 8080)
 
 }
