@@ -12,7 +12,7 @@ import scala.util.Random
   * @param target The recipient of our messages
   */
 class InputSource(target: ActorRef) extends Actor {
-  context.system.scheduler.schedule(0.second, 1.second, () => {
+  context.system.scheduler.schedule(0.second, 200.milliseconds, () => {
     target ! Random.alphanumeric.filter(_.isLetter).take(5).mkString
   })
 

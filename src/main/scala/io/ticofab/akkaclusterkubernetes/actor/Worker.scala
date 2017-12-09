@@ -27,6 +27,6 @@ class Worker extends Actor {
   }
 
   def doWork(s: String) = Future {
-    Thread.sleep(2000)
+    Thread.sleep(400)
   }
 }

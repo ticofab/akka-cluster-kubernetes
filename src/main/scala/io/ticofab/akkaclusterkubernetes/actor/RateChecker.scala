@@ -1,10 +1,13 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
+import java.time.LocalDateTime
+
 import akka.actor.Actor
 import akka.stream._
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.{EvaluateRate, Init}
 import io.ticofab.akkaclusterkubernetes.actor.Router.Ack
 
+import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
@@ -19,37 +22,46 @@ class RateChecker extends Actor {
   val workerRouter = context.actorOf(Router(), "router")
 
   // the jobs to execute
-  var jobs: List[String] = List()
+  var jobs: Queue[(String, LocalDateTime)] = Queue()
 
   // state to evaluate rate of message processing
-  var completedJobs = 0
+  var completedJobs: Set[(String, LocalDateTime)] = Set()
 
   context.system.scheduler.schedule(10.seconds, 10.seconds, self, EvaluateRate)
 
   override def receive = {
     case s: String =>
       println("received job: " + s)
-      jobs = s :: jobs
+      jobs = jobs.enqueue((s, LocalDateTime.now))
 
     case Init =>
       // son is ready!
       println("son is ready")
-      workerRouter ! jobs.head
+      workerRouter ! jobs.head._1
       jobs = jobs.tail
 
-    case Ack =>
+    case Ack(s) =>
       // we can send another one!
-      completedJobs += 1
-      workerRouter ! jobs.head
+      println("received ack: " + s)
+      completedJobs += ((s, LocalDateTime.now))
+      workerRouter ! jobs.head._1
       jobs = jobs.tail
 
     case EvaluateRate =>
-      val rate = completedJobs match {
-        case 0 => 0.0
-        case x => jobs.size.toDouble / x.toDouble
+      // calculate rate at which we are processing jobs
+      val rate = {
+        val recentJobs = jobs filter { case (s, ts) => ts.isAfter(LocalDateTime.now minusSeconds 10) }
+        val recentCompletions = completedJobs filter { case (s, ts) => ts.isAfter(LocalDateTime.now minusSeconds 10) }
+        if (recentJobs.isEmpty || recentCompletions.isEmpty) -1.0
+        else recentCompletions.size.toDouble / recentJobs.size.toDouble
       }
-      // TODO: this isn't a real rate
-      println(s"${self.path.name}, jobs to do: ${jobs.size}, completed: $completedJobs, rate = $rate")
+
+      // TODO: we need rate to be slightly above 1.0
+      // TODO: if rate < 1.0, there are more incoming jobs than processing speed ---> add node
+      // TODO: if rate > 1.2, there is too much processing power ---> remove node
+
+      println(s"${self.path.name}, jobs in queue: ${jobs.size}")
+      println(s"${self.path.name}, processing rate: $rate")
   }
 }
 

@@ -1,7 +1,7 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.Done
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, UnreachableMember}
 import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
@@ -26,8 +26,6 @@ class Router extends Actor {
         allowLocalRoutees = false)).props(),
     name = "workerRouter")
 
-  var myUser: Option[ActorRef] = None
-
   override def receive = empty
 
   def empty: Receive = {
@@ -46,7 +44,7 @@ class Router extends Actor {
       val ackRecipient = sender
       (workerRouter ? s) (3.seconds).mapTo[JobResult].onComplete {
         case Success(jobResult) => jobResult.outcome match {
-          case Some(done) => ackRecipient ! Ack
+          case Some(done) => ackRecipient ! Ack(s)
           case None => // agh!
         }
         case Failure(error) => // agh!
@@ -59,7 +57,7 @@ object Router {
 
   case class JobResult(outcome: Option[Done])
 
-  case object Ack
+  case class Ack(s: String)
 
   case object Complete
 
