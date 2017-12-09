@@ -72,3 +72,14 @@ object Master {
   case class JobDone(s: String)
 
 }
+
+/*
+
+  notes from call on 9 december with Adam
+
+  - we keep it to 1 worker per node, at that point we know exactly how many workers we have
+  - each node will have its own pod ---> one pod is one node is one worker
+  - only process messages where there is actual chance of processing them, so NOT loose messages!
+  - if a message times out, then it should go back in the queue
+
+ */
