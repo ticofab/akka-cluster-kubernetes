@@ -1,9 +1,6 @@
 package io.ticofab.akkaclusterkubernetes
 
 import akka.actor.{ActorSystem, Props}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.server.Directives._
-import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
 import io.ticofab.akkaclusterkubernetes.actor.Supervisor
 
@@ -14,14 +11,8 @@ object AkkaClusterKubernetesApp extends App {
   type Job = String
 
   implicit val as = ActorSystem("akka-cluster-kubernetes")
-
   val roles = ConfigFactory.load().getStringList("akka.cluster.roles")
-  if (roles.contains("seed")) {
-    as.actorOf(Props(new Supervisor), "supervisor")
-    // test server to check if this guy is alive
-    implicit val am = ActorMaterializer()
-    Http().bindAndHandle(get(complete("ACK is alive!")), "0.0.0.0", 8080)
-  }
+  if (roles.contains("seed")) as.actorOf(Props(new Supervisor), "supervisor")
 
   /*
 
