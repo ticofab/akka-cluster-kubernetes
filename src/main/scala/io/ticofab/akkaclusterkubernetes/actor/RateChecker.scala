@@ -17,7 +17,7 @@ class RateChecker extends Actor {
   val settings = ActorMaterializerSettings(as).withSupervisionStrategy(_ => Supervision.Restart)
   implicit val am = ActorMaterializer()
 
-  println(s"creating master ${self.path.name}")
+  println("creating rate checker")
 
   // the router
   val workerRouter = context.actorOf(Router(), "router")
@@ -31,7 +31,9 @@ class RateChecker extends Actor {
   context.system.scheduler.schedule(10.seconds, 10.seconds, self, EvaluateRate)
 
   override def receive = {
-    case job: Job => jobs = jobs.enqueue((job, LocalDateTime.now))
+    case job: Job =>
+      // TODO discard messages if queue already too big or something
+      jobs = jobs.enqueue((job, LocalDateTime.now))
 
     case Init =>
       // son is ready!

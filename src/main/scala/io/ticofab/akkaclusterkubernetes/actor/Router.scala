@@ -4,9 +4,9 @@ import akka.Done
 import akka.actor.{Actor, Props}
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, UnreachableMember}
-import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
+import akka.cluster.routing.{ClusterRouterPool, ClusterRouterPoolSettings}
 import akka.pattern.ask
-import akka.routing.RoundRobinGroup
+import akka.routing.RoundRobinPool
 import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, JobResult, NewJobs}
 
@@ -18,13 +18,15 @@ import scala.util.{Failure, Success}
 class Router extends Actor {
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
 
+  // the router pool
   val workerRouter = context.actorOf(
-    ClusterRouterGroup(
-      RoundRobinGroup(Nil),
-      ClusterRouterGroupSettings(
+    ClusterRouterPool(
+      RoundRobinPool(0),
+      ClusterRouterPoolSettings(
         totalInstances = 100,
-        routeesPaths = List("/user/worker"),
-        allowLocalRoutees = false)).props(),
+        maxInstancesPerNode = 1,
+        allowLocalRoutees = false)
+    ).props(Props[Worker]),
     name = "workerRouter")
 
   override def receive = empty
@@ -32,8 +34,8 @@ class Router extends Actor {
   def empty: Receive = {
     case MemberUp(m) =>
       println(s"the first member joined: ${m.address.toString}")
-      context.parent ! Init
       context become ready(1)
+      context.parent ! Init
   }
 
   def ready(workers: Int): Receive = {

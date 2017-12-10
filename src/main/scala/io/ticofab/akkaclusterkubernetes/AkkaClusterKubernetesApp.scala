@@ -5,7 +5,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
-import io.ticofab.akkaclusterkubernetes.actor.{Supervisor, Worker}
+import io.ticofab.akkaclusterkubernetes.actor.Supervisor
 
 
 object AkkaClusterKubernetesApp extends App {
@@ -21,10 +21,7 @@ object AkkaClusterKubernetesApp extends App {
     // test server to check if this guy is alive
     implicit val am = ActorMaterializer()
     Http().bindAndHandle(get(complete("ACK is alive!")), "0.0.0.0", 8080)
-  } else {
-    as.actorOf(Props[Worker], "worker")
   }
-
 
   /*
 
