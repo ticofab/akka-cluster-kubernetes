@@ -8,8 +8,7 @@ import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
 import akka.pattern.ask
 import akka.routing.RoundRobinGroup
 import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
-import io.ticofab.akkaclusterkubernetes.actor.RateChecker.Init
-import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, JobResult, NewJobs}
+import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, JobResult, NewJobs}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -32,21 +31,23 @@ class Router extends Actor {
 
   def empty: Receive = {
     case MemberUp(m) =>
-      println("the first member joined: " + m.address.toString)
+      println(s"the first member joined: ${m.address.toString}")
       context.parent ! Init
       context become ready(1)
   }
 
   def ready(workers: Int): Receive = {
     // a member joined the cluster
-    case MemberUp(m) => context become ready(workers + 1)
+    case MemberUp(m) =>
+      println(s"a new member joined: ${m.address.toString}")
+      context become ready(workers + 1)
 
     // a member left the cluster
     case MemberExited(m) => context become (if (workers == 1) empty else ready(workers - 1))
 
     // we received new jobs to execute
     case NewJobs(jobs) =>
-      println(s"received ${jobs.size} jobs")
+      // println(s"received ${jobs.size} jobs")
       val ackRecipient = sender
       val seq = Future.sequence(jobs.map(job => (workerRouter ? job) (3.seconds).mapTo[JobResult]))
       seq onComplete {
@@ -58,6 +59,8 @@ class Router extends Actor {
 
 object Router {
   def apply(): Props = Props(new Router)
+
+  case object Init
 
   case class NewJobs(jobs: List[Job])
 
