@@ -11,8 +11,9 @@ class Supervisor extends Actor {
       Restart
   }
 
-  // create mast and input source actors
-  val rateChecker = context.actorOf(Props[RateChecker], "rateChecker")
+  // create actors
+  val kubernetesController = context.actorOf(KubernetesController(), "k8s-controller")
+  val rateChecker = context.actorOf(RateChecker(kubernetesController), "rateChecker")
   context.actorOf(Props(new InputSource(rateChecker)), "inputSource")
 
   override def receive = Actor.emptyBehavior

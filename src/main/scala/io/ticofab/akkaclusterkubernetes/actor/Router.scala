@@ -35,7 +35,7 @@ class Router extends Actor {
     case MemberUp(m) =>
       println(s"the first member joined: ${m.address.toString}")
       context become ready(1)
-      context.parent ! Init
+      context.system.scheduler.scheduleOnce(1.second, context.parent, Init)
   }
 
   def ready(workers: Int): Receive = {

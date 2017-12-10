@@ -2,7 +2,7 @@ package io.ticofab.akkaclusterkubernetes.actor
 
 import java.time.LocalDateTime
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Props}
 import akka.stream._
 import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.EvaluateRate
@@ -12,7 +12,7 @@ import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RateChecker extends Actor {
+class RateChecker(k8sController: ActorRef) extends Actor {
   implicit val as = context.system
   val settings = ActorMaterializerSettings(as).withSupervisionStrategy(_ => Supervision.Restart)
   implicit val am = ActorMaterializer()
@@ -62,7 +62,9 @@ class RateChecker extends Actor {
 
       // TODO: we need rate to be slightly above 1.0
       // TODO: if rate < 1.0, there are more incoming jobs than processing speed ---> add node
+      // k8sController ! AddNode
       // TODO: if rate > 1.2, there is too much processing power ---> remove node
+      // k8sController ! RemoveNode
 
       println(s"${self.path.name}, jobs in queue: ${jobs.size}")
       println(s"${self.path.name}, processing rate: $rate")
@@ -71,6 +73,8 @@ class RateChecker extends Actor {
 }
 
 object RateChecker {
+
+  def apply(k8sController: ActorRef): Props = Props(new RateChecker(k8sController))
 
   case object EvaluateRate
 
