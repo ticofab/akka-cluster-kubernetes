@@ -4,8 +4,9 @@ import java.time.LocalDateTime
 
 import akka.actor.Actor
 import akka.stream._
+import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.{EvaluateRate, Init}
-import io.ticofab.akkaclusterkubernetes.actor.Router.Ack
+import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, NewJobs}
 
 import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -22,30 +23,31 @@ class RateChecker extends Actor {
   val workerRouter = context.actorOf(Router(), "router")
 
   // the jobs to execute
-  var jobs: Queue[(String, LocalDateTime)] = Queue()
+  var jobs: Queue[(Job, LocalDateTime)] = Queue()
 
   // state to evaluate rate of message processing
-  var completedJobs: Set[(String, LocalDateTime)] = Set()
+  var completedJobs: Set[(Job, LocalDateTime)] = Set()
 
   context.system.scheduler.schedule(10.seconds, 10.seconds, self, EvaluateRate)
 
   override def receive = {
-    case s: String =>
-      println("received job: " + s)
-      jobs = jobs.enqueue((s, LocalDateTime.now))
+    case job: Job =>
+      println("received job: " + job)
+      jobs = jobs.enqueue((job, LocalDateTime.now))
 
     case Init =>
       // son is ready!
       println("son is ready")
-      workerRouter ! jobs.head._1
-      jobs = jobs.tail
+      workerRouter ! NewJobs(List(jobs.head._1))
+      jobs = jobs.drop(1)
 
-    case Ack(s) =>
-      // we can send another one!
-      println("received ack: " + s)
-      completedJobs += ((s, LocalDateTime.now))
-      workerRouter ! jobs.head._1
-      jobs = jobs.tail
+    case Ack(jobResults, availableWorkers) =>
+      // we can send more jobs!
+      println(s"received ack with jobs $jobResults, available workers: $availableWorkers")
+      // TODO: filter out failed jobs
+      completedJobs ++= jobResults.map(jr => (jr.job, LocalDateTime.now))
+      workerRouter ! NewJobs(jobs.take(availableWorkers).map(_._1).toList)
+      jobs = jobs.drop(availableWorkers)
 
     case EvaluateRate =>
       // calculate rate at which we are processing jobs
@@ -63,6 +65,7 @@ class RateChecker extends Actor {
       println(s"${self.path.name}, jobs in queue: ${jobs.size}")
       println(s"${self.path.name}, processing rate: $rate")
   }
+
 }
 
 object RateChecker {

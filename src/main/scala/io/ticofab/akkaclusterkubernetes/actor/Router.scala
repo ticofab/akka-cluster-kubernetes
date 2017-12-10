@@ -7,10 +7,12 @@ import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, Unreachab
 import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
 import akka.pattern.ask
 import akka.routing.RoundRobinGroup
+import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.Init
-import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, JobResult}
+import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, JobResult, NewJobs}
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
@@ -33,21 +35,23 @@ class Router extends Actor {
       println("the first member joined: " + m.address.toString)
       context.parent ! Init
       context become ready(1)
-
-    case s: String => // do nothing
   }
 
   def ready(workers: Int): Receive = {
+    // a member joined the cluster
     case MemberUp(m) => context become ready(workers + 1)
-    case MemberExited(m) => context become (if (workers == 1) empty else ready(workers + 1))
-    case s: String =>
+
+    // a member left the cluster
+    case MemberExited(m) => context become (if (workers == 1) empty else ready(workers - 1))
+
+    // we received new jobs to execute
+    case NewJobs(jobs) =>
+      println(s"received ${jobs.size} jobs")
       val ackRecipient = sender
-      (workerRouter ? s) (3.seconds).mapTo[JobResult].onComplete {
-        case Success(jobResult) => jobResult.outcome match {
-          case Some(done) => ackRecipient ! Ack(s)
-          case None => // agh!
-        }
-        case Failure(error) => // agh!
+      val seq = Future.sequence(jobs.map(job => (workerRouter ? job) (3.seconds).mapTo[JobResult]))
+      seq onComplete {
+        case Success(res) => ackRecipient ! Ack(res, workers)
+        case Failure(error) => ??? // TODO
       }
   }
 }
@@ -55,9 +59,13 @@ class Router extends Actor {
 object Router {
   def apply(): Props = Props(new Router)
 
-  case class JobResult(outcome: Option[Done])
+  case class NewJobs(jobs: List[Job])
 
-  case class Ack(s: String)
+  case class JobsList(jobs: List[Job])
+
+  case class JobResult(job: Job, outcome: Option[Done])
+
+  case class Ack(jobsCompleted: List[JobResult], availableWorkers: Int)
 
   case object Complete
 

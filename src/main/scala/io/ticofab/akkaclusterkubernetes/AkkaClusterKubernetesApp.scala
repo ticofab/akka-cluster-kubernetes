@@ -7,7 +7,12 @@ import akka.stream.ActorMaterializer
 import com.typesafe.config.ConfigFactory
 import io.ticofab.akkaclusterkubernetes.actor.{Supervisor, Worker}
 
+
 object AkkaClusterKubernetesApp extends App {
+
+  // define a type alias to be used through out
+  type Job = String
+
   implicit val as = ActorSystem("akka-cluster-kubernetes")
 
   val roles = ConfigFactory.load().getStringList("akka.cluster.roles")

@@ -5,6 +5,7 @@ import java.time.format.DateTimeFormatter
 
 import akka.Done
 import akka.actor.Actor
+import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.JobResult
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -15,18 +16,18 @@ class Worker extends Actor {
   println(s"creating worker ${self.path.name}")
 
   override def receive = {
-    case s: String =>
-      println(s"${self.path.name}, ${LocalDateTime.now.format(DateTimeFormatter.ISO_LOCAL_TIME)}, received $s")
+    case job: Job =>
+      println(s"${self.path.name}, ${LocalDateTime.now.format(DateTimeFormatter.ISO_LOCAL_TIME)}, received $job")
       val originalSender = sender
       val tb = System.currentTimeMillis
-      doWork(s).onComplete(_ => {
+      executeJob(job).onComplete(_ => {
         val et = System.currentTimeMillis - tb
         println(s"${self.path.name}, evaluated task in $et milliseconds.")
-        originalSender ! JobResult(Some(Done))
+        originalSender ! JobResult(job, Some(Done))
       })
   }
 
-  def doWork(s: String) = Future {
+  def executeJob(job: Job) = Future {
     Thread.sleep(400)
   }
 }
