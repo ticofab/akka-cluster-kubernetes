@@ -18,16 +18,16 @@ class KubernetesController extends Actor {
 
     case AddNode =>
       println(s"AddNode: $AddNode")
-      val client = new DefaultKubernetesClient()
+      val client = new DefaultKubernetesClient().inNamespace("default")
 
       val role = "worker"
       val statefulSetName = s"akka-$role"
-      val statefulSet = client.apps().statefulSets().withName(statefulSetName).get()
 
-      if (statefulSet != null) {
+      if (client.apps().statefulSets().withName(statefulSetName).get() != null) {
         println("Scaling up StatefulSet " + statefulSetName)
         //scale up the existing statefulset
-        statefulSet.getSpec.setReplicas(statefulSet.getSpec.getReplicas + 1)
+        var replicas = client.apps().statefulSets().withName(statefulSetName).get().getSpec.getReplicas + 1
+        client.apps().statefulSets().withName(statefulSetName).scale(replicas)
       } else {
         println("Creating new Statefulset " + statefulSetName)
         //create new statefulset
@@ -52,7 +52,7 @@ class KubernetesController extends Actor {
             ).build()
           ).build()
 
-        client.inNamespace("default").apps().statefulSets()
+        client.apps().statefulSets()
           .createNew()
           .withMetadata(
             new ObjectMetaBuilder()
