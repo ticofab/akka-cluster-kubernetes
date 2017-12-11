@@ -1,15 +1,12 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
-import java.util
-
 import akka.actor.{Actor, Props}
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.extensions.StatefulSetSpecBuilder
-import io.fabric8.kubernetes.client.{ConfigBuilder, DefaultKubernetesClient, KubernetesClientException}
+import io.fabric8.kubernetes.client.DefaultKubernetesClient
 import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.{AddNode, RemoveNode}
 
 import scala.collection.JavaConverters
-import scala.io.Source
 
 // TODO this guys knows the kubernetes ways
 class KubernetesController extends Actor {
@@ -17,63 +14,78 @@ class KubernetesController extends Actor {
   override def receive = {
 
     case AddNode =>
-      println(s"AddNode: $AddNode")
-      val client = new DefaultKubernetesClient().inNamespace("default")
 
+      println("AddNode")
+
+      val client = new DefaultKubernetesClient().inNamespace("default")
       val role = "worker"
       val statefulSetName = s"akka-$role"
+      val apps = client.apps.statefulSets.withName(statefulSetName)
 
-      if (client.apps().statefulSets().withName(statefulSetName).get() != null) {
-        println("Scaling up StatefulSet " + statefulSetName)
-        //scale up the existing statefulset
-        var replicas = client.apps().statefulSets().withName(statefulSetName).get().getSpec.getReplicas + 1
-        client.apps().statefulSets().withName(statefulSetName).scale(replicas)
+      if (apps.get != null) {
+
+        // scale up the existing stateful set by one node
+        println(s"Scaling up StatefulSet $statefulSetName")
+
+        val replicas = apps.get.getSpec.getReplicas + 1
+        apps.scale(replicas)
+
       } else {
-        println("Creating new Statefulset " + statefulSetName)
-        //create new statefulset
-        val envVars = JavaConverters.seqAsJavaList(List[EnvVar](
-          new EnvVarBuilder().withName("ROLE").withValue("worker").build()))
 
-        val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role))
+        // create new stateful set
+        println(s"Creating new stateful set $statefulSetName")
 
-        val podTemplate = new PodTemplateSpecBuilder()
-          .withMetadata(new ObjectMetaBuilder().withLabels(labels).build())
-          .withSpec(new PodSpecBuilder()
-            .withTerminationGracePeriodSeconds(10L)
-            .withContainers(new ContainerBuilder()
-              .withName(s"akka-$role")
-              .withImage(s"adamsandor83/akka-$role")
-              .withImagePullPolicy("Always")
-              .withEnv(envVars)
-              .withPorts(
-                JavaConverters.seqAsJavaList[ContainerPort](List(new ContainerPortBuilder().withContainerPort(2551).build())
-                )
-              ).build()
-            ).build()
-          ).build()
-
+        val newSetSpec = getNewStatefulSetSpec(role)
+        val nameMetadata = new ObjectMetaBuilder().withName(statefulSetName).build
         client.apps().statefulSets()
           .createNew()
-          .withMetadata(
-            new ObjectMetaBuilder()
-              .withName(statefulSetName)
-              .build())
-          .withSpec(
-            new StatefulSetSpecBuilder()
-              .withSelector(
-                new LabelSelectorBuilder()
-                  .withMatchLabels(labels)
-                  .build()
-              )
-              .withPodManagementPolicy("Parallel")
-              .withReplicas(1)
-              .withServiceName("akka")
-              .withTemplate(podTemplate)
-              .build()).done()
+          .withMetadata(nameMetadata)
+          .withSpec(newSetSpec)
+          .done
       }
 
     case RemoveNode => ???
 
+  }
+
+  def getNewStatefulSetSpec(role: String) = {
+
+    val envVars = JavaConverters.seqAsJavaList(
+      List[EnvVar](new EnvVarBuilder().withName("ROLE").withValue("worker").build))
+
+    val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role))
+
+    val containerPort = new ContainerPortBuilder().withContainerPort(2551).build()
+
+    val container = new ContainerBuilder()
+      .withName(s"akka-$role")
+      .withImage(s"adamsandor83/akka-$role")
+      .withImagePullPolicy("Always")
+      .withEnv(envVars)
+      .withPorts(JavaConverters.seqAsJavaList[ContainerPort](List(containerPort)))
+      .build
+
+    val spec = new PodSpecBuilder()
+      .withTerminationGracePeriodSeconds(10L)
+      .withContainers(container)
+      .build
+
+    val labelMetadata = new ObjectMetaBuilder().withLabels(labels).build
+
+    val labelSelector = new LabelSelectorBuilder().withMatchLabels(labels).build
+
+    val podTemplate = new PodTemplateSpecBuilder()
+      .withMetadata(labelMetadata)
+      .withSpec(spec)
+      .build
+
+    new StatefulSetSpecBuilder()
+      .withSelector(labelSelector)
+      .withPodManagementPolicy("Parallel")
+      .withReplicas(1)
+      .withServiceName("akka")
+      .withTemplate(podTemplate)
+      .build
   }
 
 }
