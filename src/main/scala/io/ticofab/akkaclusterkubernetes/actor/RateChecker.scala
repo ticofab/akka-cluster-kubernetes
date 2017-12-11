@@ -5,6 +5,7 @@ import java.time.LocalDateTime
 import akka.actor.{Actor, ActorRef, Props}
 import akka.stream._
 import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
+import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.AddNode
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.EvaluateRate
 import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, NewJobs}
 
@@ -62,7 +63,7 @@ class RateChecker(k8sController: ActorRef) extends Actor {
 
       // TODO: we need rate to be slightly above 1.0
       // TODO: if rate < 1.0, there are more incoming jobs than processing speed ---> add node
-      // k8sController ! AddNode
+      k8sController ! AddNode
       // TODO: if rate > 1.2, there is too much processing power ---> remove node
       // k8sController ! RemoveNode
 
