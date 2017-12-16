@@ -1,0 +1,43 @@
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: akka-master
+spec:
+  selector:
+    matchLabels:
+      cluster: cluster1
+      role: master
+  replicas: 1
+  serviceName: akka
+  template:
+    metadata:
+      labels:
+        cluster: cluster1
+        role: master
+    spec:
+      terminationGracePeriodSeconds: 3
+      containers:
+      - name: akka-example
+        image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:47a796d
+        imagePullPolicy: Always
+        env:
+            - name: clusterid
+              value: cluster1
+            - name: ROLE
+              value: seed
+        ports:
+        - containerPort: 2551
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: akka
+  labels:
+    cluster: cluster1
+spec:
+  ports:
+  - port: 2551
+    name: akka
+  clusterIP: None
+  selector:
+    cluster: cluster1

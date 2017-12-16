@@ -30,3 +30,6 @@ dockerLabels := Map("maintainer" -> organization.value, "branch" -> branch, "ver
 dockerBaseImage := "openjdk:8-jre"
 defaultLinuxInstallLocation in Docker := s"/opt/${name.value}" // to have consistent directory for files
 dockerRepository := Some("eu.gcr.io")
+
+//universal:packageBin
+//docker:packageDocker

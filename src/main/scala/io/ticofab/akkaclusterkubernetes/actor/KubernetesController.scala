@@ -29,7 +29,6 @@ class KubernetesController extends Actor {
 
         val replicas = apps.get.getSpec.getReplicas + 1
         apps.scale(replicas)
-
       } else {
 
         // create new stateful set
