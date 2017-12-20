@@ -17,7 +17,7 @@ class KubernetesController extends Actor {
 
       println("AddNode")
 
-      val client = new DefaultKubernetesClient().inNamespace("default")
+      val client = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
       val role = "worker"
       val statefulSetName = s"akka-$role"
       val apps = client.apps.statefulSets.withName(statefulSetName)
@@ -25,10 +25,16 @@ class KubernetesController extends Actor {
       if (apps.get != null) {
 
         // scale up the existing stateful set by one node
-        println(s"Scaling up StatefulSet $statefulSetName")
 
         val replicas = apps.get.getSpec.getReplicas + 1
-        apps.scale(replicas)
+
+        if (replicas < 5) {
+          println(s"Scaling up StatefulSet $statefulSetName to $replicas replicas")
+
+          apps.scale(replicas)
+        } else {
+          println("Can't scale up. Reached maximum number of replicas")
+        }
       } else {
 
         // create new stateful set
@@ -58,7 +64,7 @@ class KubernetesController extends Actor {
 
     val container = new ContainerBuilder()
       .withName(s"akka-$role")
-      .withImage(s"adamsandor83/akka-$role")
+      .withImage(s"eu.gcr.io/adam-akka/akka-cluster-kubernetes:" + System.getenv("version"))
       .withImagePullPolicy("Always")
       .withEnv(envVars)
       .withPorts(JavaConverters.seqAsJavaList[ContainerPort](List(containerPort)))

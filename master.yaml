@@ -17,14 +17,20 @@ spec:
     spec:
       terminationGracePeriodSeconds: 3
       containers:
-      - name: akka-example
-        image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:47a796d
+      - name: akka-master
+        image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:f26b4c0
         imagePullPolicy: Always
         env:
             - name: clusterid
               value: cluster1
             - name: ROLE
               value: seed
+            - name: version
+              value: f26b4c0
+            - name: namespace
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
         ports:
         - containerPort: 2551
 ---

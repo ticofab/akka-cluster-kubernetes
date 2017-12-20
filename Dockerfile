@@ -1,5 +1,7 @@
 FROM hseeberger/scala-sbt AS build
 
+RUN sbt update
+
 WORKDIR /build
 
 ADD . /build
