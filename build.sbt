@@ -25,7 +25,7 @@ lazy val shortCommit = ("git rev-parse --short HEAD" !!).replaceAll("\\n", "").r
 lazy val branch = ("git rev-parse --abbrev-ref HEAD" !!).replaceAll("\\n", "").replaceAll("\\r", "")
 
 packageName in Docker := "adam-akka/" + name.value
-version in Docker := shortCommit
+version in Docker := "latest"
 dockerLabels := Map("maintainer" -> organization.value, "branch" -> branch, "version" -> version.value)
 dockerBaseImage := "openjdk:8-jre"
 defaultLinuxInstallLocation in Docker := s"/opt/${name.value}" // to have consistent directory for files
