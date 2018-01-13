@@ -18,7 +18,7 @@ spec:
       terminationGracePeriodSeconds: 3
       containers:
       - name: akka-master
-        image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:f26b4c0
+        image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:cfb734e
         imagePullPolicy: Always
         env:
             - name: clusterid
@@ -26,7 +26,7 @@ spec:
             - name: ROLE
               value: seed
             - name: version
-              value: f26b4c0
+              value: cfb734e
             - name: namespace
               valueFrom:
                 fieldRef:

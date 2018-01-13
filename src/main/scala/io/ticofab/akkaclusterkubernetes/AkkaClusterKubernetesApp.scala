@@ -12,7 +12,13 @@ object AkkaClusterKubernetesApp extends App {
 
   implicit val as = ActorSystem("akka-cluster-kubernetes")
   val roles = ConfigFactory.load().getStringList("akka.cluster.roles")
-  if (roles.contains("seed")) as.actorOf(Props(new Supervisor), "supervisor")
+  println(s"roles=${roles}")
+  if (roles.contains("seed")) {
+    println("This node is a seed node")
+    as.actorOf(Props(new Supervisor), "supervisor")
+  } else {
+    println("This node is a worker node")
+  }
 
   /*
 

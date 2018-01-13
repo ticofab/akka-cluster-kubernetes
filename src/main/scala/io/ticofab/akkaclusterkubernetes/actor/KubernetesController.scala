@@ -3,7 +3,7 @@ package io.ticofab.akkaclusterkubernetes.actor
 import akka.actor.{Actor, Props}
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.extensions.StatefulSetSpecBuilder
-import io.fabric8.kubernetes.client.DefaultKubernetesClient
+import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernetesClient}
 import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.{AddNode, RemoveNode}
 
 import scala.collection.JavaConverters
@@ -11,15 +11,24 @@ import scala.collection.JavaConverters
 // TODO this guys knows the kubernetes ways
 class KubernetesController extends Actor {
 
+  val client: NamespacedKubernetesClient = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
+  val role = "worker"
+  val statefulSetName = s"akka-$role"
+
+  override def postStop(): Unit = {
+    super.postStop()
+
+    println("Stopping controller - deleting all workers")
+
+    client.apps.statefulSets().withName(statefulSetName).delete()
+  }
+
   override def receive = {
 
     case AddNode =>
 
       println("AddNode")
 
-      val client = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
-      val role = "worker"
-      val statefulSetName = s"akka-$role"
       val apps = client.apps.statefulSets.withName(statefulSetName)
 
       if (apps.get != null) {
@@ -58,7 +67,7 @@ class KubernetesController extends Actor {
     val envVars = JavaConverters.seqAsJavaList(
       List[EnvVar](new EnvVarBuilder().withName("ROLE").withValue("worker").build))
 
-    val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role))
+    val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role, "cluster" -> "cluster1"))
 
     val containerPort = new ContainerPortBuilder().withContainerPort(2551).build()
 
