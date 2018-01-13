@@ -8,6 +8,10 @@ import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.{AddNode, Rem
 
 import scala.collection.JavaConverters
 
+// TODO: tune how fast workers are created
+// TODO: insert switch to not use kubernetes
+
+
 // TODO this guys knows the kubernetes ways
 class KubernetesController extends Actor {
 
