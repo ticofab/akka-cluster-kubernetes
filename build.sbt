@@ -32,4 +32,15 @@ defaultLinuxInstallLocation in Docker := s"/opt/${name.value}" // to have consis
 dockerRepository := Some("eu.gcr.io")
 
 //universal:packageBin
-//docker:packageDocker
+
+//deploy:
+// docker:publishLocal
+// gcloud docker -- push eu.gcr.io/adam-akka/akka-cluster-kubernetes:latest
+// kubectl apply -f master.yaml
+
+//stop working:
+// kubectl delete -f master.yaml
+
+//redeploy:
+// kubectl delete statefulset akka-master
+// kubectl apply -f master.yaml

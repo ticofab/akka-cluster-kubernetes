@@ -54,7 +54,7 @@ class Router extends Actor {
       val seq = Future.sequence(jobs.map(job => (workerRouter ? job) (3.seconds).mapTo[JobResult]))
       seq onComplete {
         case Success(res) => ackRecipient ! Ack(res, workers)
-        case Failure(error) => ??? // TODO
+        case Failure(error) => println(error)
       }
   }
 }

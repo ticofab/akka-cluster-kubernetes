@@ -62,7 +62,29 @@ class KubernetesController extends Actor {
           .done
       }
 
-    case RemoveNode => ???
+    case RemoveNode =>
+      println("RemoveNode")
+
+      val apps = client.apps.statefulSets.withName(statefulSetName)
+
+      if (apps.get != null) {
+
+        // scale up the existing stateful set by one node
+
+        val replicas = apps.get.getSpec.getReplicas - 1
+
+        if (replicas >= 1) {
+          println(s"Scaling down StatefulSet $statefulSetName to $replicas replicas")
+
+          apps.scale(replicas)
+
+        } else {
+          println("Only one replica remains in the StatefulSet - not scaling down")
+        }
+      } else {
+        println("Statefulset doesn't exist, not scaling down")
+      }
+
 
   }
 
