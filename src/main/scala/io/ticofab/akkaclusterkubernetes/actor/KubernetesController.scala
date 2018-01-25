@@ -10,9 +10,11 @@ import scala.collection.JavaConverters
 
 // TODO: tune how fast workers are created
 // TODO: insert switch to not use kubernetes
+// TODO: provide some readiness probe
 
-
-// TODO this guys knows the kubernetes ways
+/**
+  * This guy knows the K8S ways, while the rest of the app is K8S-agnostic.
+  */
 class KubernetesController extends Actor {
 
   val client: NamespacedKubernetesClient = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
@@ -38,6 +40,9 @@ class KubernetesController extends Actor {
       if (apps.get != null) {
 
         // scale up the existing stateful set by one node
+        //        val status = apps.get.getStatus
+        //        val currentReplicas = status.getCurrentReplicas
+        //        val readyReplicas = status.getReadyReplicas
 
         val replicas = apps.get.getSpec.getReplicas + 1
 
@@ -97,10 +102,24 @@ class KubernetesController extends Actor {
 
     val containerPort = new ContainerPortBuilder().withContainerPort(2551).build()
 
+    // commented out code about the readiness probe for now
+    //
+    //    val httpGet = new HTTPGetActionBuilder()
+    //      .withPath("/")
+    //      .withPort(new IntOrString(8080))
+    //      .build
+    //
+    //    val readinessProbe = new ProbeBuilder()
+    //      .withHttpGet(httpGet)
+    //      .withFailureThreshold(5)
+    //      .withTimeoutSeconds(60)
+    //      .build
+
     val container = new ContainerBuilder()
       .withName(s"akka-$role")
       .withImage(s"eu.gcr.io/adam-akka/akka-cluster-kubernetes:" + System.getenv("version"))
       .withImagePullPolicy("Always")
+      // .withReadinessProbe(readinessProbe)
       .withEnv(envVars)
       .withPorts(JavaConverters.seqAsJavaList[ContainerPort](List(containerPort)))
       .build

@@ -19,7 +19,7 @@ spec:
       containers:
       - name: akka-master
         image: eu.gcr.io/adam-akka/akka-cluster-kubernetes:latest
-        imagePullPolicy: Always
+        imagePullPolicy: Always # this command makes it re-use the latest image every time that a pod spins up
         env:
             - name: clusterid
               value: cluster1
