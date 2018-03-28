@@ -1,19 +1,26 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{Actor, OneForOneStrategy, Props}
+import akka.actor.{Actor, ActorLogging, OneForOneStrategy, Props}
+import io.ticofab.akkaclusterkubernetes.actor.scaling.{KubernetesController, LocalController}
+import io.ticofab.akkaclusterkubernetes.config.Config
 
-class Supervisor extends Actor {
+class Supervisor extends Actor with ActorLogging {
+
+  log.debug("Supervisor starting")
 
   override def supervisorStrategy = OneForOneStrategy() {
     case t: Throwable =>
-      println(s"${self.path.name}, caught $t")
+      log.error(t, "supervisor, caught exception, restarting failing child")
       Restart
   }
 
   // create actors
-  val kubernetesController = context.actorOf(KubernetesController(), "k8s-controller")
-  val rateChecker = context.actorOf(RateChecker(kubernetesController), "rateChecker")
+  val scalingController =
+    if (Config.kubernetes.`use-kubernetes`) context.actorOf(KubernetesController(), "k8s-controller")
+    else context.actorOf(LocalController())
+
+  val rateChecker = context.actorOf(RateChecker(scalingController), "rateChecker")
   context.actorOf(Props(new InputSource(rateChecker)), "inputSource")
 
   override def receive = Actor.emptyBehavior

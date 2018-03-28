@@ -1,17 +1,28 @@
 name := "akka-cluster-kubernetes"
 version := "0.0.1"
-scalaVersion := "2.12.4"
+scalaVersion := "2.12.5"
 organization := "ticofab.io"
 
 libraryDependencies ++= {
-  val akkaVersion = "2.5.8"
+  val akkaVersion = "2.5.11"
   Seq(
+
+    // akka stuff
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
     "com.typesafe.akka" %% "akka-stream" % akkaVersion,
     "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
-    "com.typesafe.akka" %% "akka-http" % "10.0.11",
+    "com.typesafe.akka" %% "akka-http" % "10.1.0",
+
+    // kubernetes stuff
     "io.fabric8" % "kubernetes-client" % "3.1.1",
-    "io.fabric8" % "kubernetes-api" % "3.0.8"
+    "io.fabric8" % "kubernetes-api" % "3.0.8",
+
+    // logging
+    "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+
+    // ficus for config
+    // https://github.com/iheartradio/ficus
+    "com.iheart" %% "ficus" % "1.4.3"
   )
 }
 

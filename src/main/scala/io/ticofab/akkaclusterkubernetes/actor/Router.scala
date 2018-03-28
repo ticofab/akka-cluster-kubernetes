@@ -1,7 +1,7 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.Done
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 import akka.cluster.Cluster
 import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, UnreachableMember}
 import akka.cluster.routing.{ClusterRouterPool, ClusterRouterPoolSettings}
@@ -15,7 +15,8 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
-class Router extends Actor {
+class Router extends Actor with ActorLogging {
+
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
 
   // the router pool
@@ -33,7 +34,7 @@ class Router extends Actor {
 
   def empty: Receive = {
     case MemberUp(m) =>
-      println(s"the first member joined: ${m.address.toString}")
+      log.debug(s"the first member joined: ${m.address.toString}")
       context become ready(1)
       context.system.scheduler.scheduleOnce(1.second, context.parent, Init)
   }
@@ -41,7 +42,7 @@ class Router extends Actor {
   def ready(workers: Int): Receive = {
     // a member joined the cluster
     case MemberUp(m) =>
-      println(s"a new member joined: ${m.address.toString}")
+      log.debug(s"a new member joined: ${m.address.toString}")
       context become ready(workers + 1)
 
     // a member left the cluster
@@ -54,7 +55,7 @@ class Router extends Actor {
       val seq = Future.sequence(jobs.map(job => (workerRouter ? job) (3.seconds).mapTo[JobResult]))
       seq onComplete {
         case Success(res) => ackRecipient ! Ack(res, workers)
-        case Failure(error) => println(error)
+        case Failure(error) => log.error(error, "error while processing jobs")
       }
   }
 }

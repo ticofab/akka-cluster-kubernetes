@@ -1,10 +1,9 @@
-package io.ticofab.akkaclusterkubernetes.actor
+package io.ticofab.akkaclusterkubernetes.actor.scaling
 
 import akka.actor.{Actor, Props}
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.extensions.StatefulSetSpecBuilder
 import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernetesClient}
-import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.{AddNode, RemoveNode}
 
 import scala.collection.JavaConverters
 
@@ -151,9 +150,4 @@ class KubernetesController extends Actor {
 
 object KubernetesController {
   def apply(): Props = Props(new KubernetesController)
-
-  case object AddNode
-
-  case object RemoveNode
-
 }

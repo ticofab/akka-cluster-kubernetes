@@ -25,6 +25,8 @@ spec:
               value: cluster1
             - name: ROLE
               value: seed
+            - name: SEED_NODE
+              value: "akka.tcp://akka-cluster-kubernetes@akka-master-0.akka:2551"
             - name: version
               value: latest
             - name: namespace

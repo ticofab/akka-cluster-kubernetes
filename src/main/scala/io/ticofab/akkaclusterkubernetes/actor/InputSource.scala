@@ -35,7 +35,7 @@ class InputSource(target: ActorRef) extends Actor {
       cancellableSchedule = as.scheduler.schedule(0.second, interval, sendingFunction)
       complete(s"rate set to 1 message every $interval.\n")
   } ~ get {
-    complete("ACK is alive!\n")
+    complete("Akka Cluster Kubernetes is alive!\n")
   }
 
   Http().bindAndHandle(routes, "0.0.0.0", 8080)

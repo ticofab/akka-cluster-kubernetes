@@ -2,23 +2,23 @@ package io.ticofab.akkaclusterkubernetes.actor
 
 import java.time.LocalDateTime
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.stream._
 import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
-import io.ticofab.akkaclusterkubernetes.actor.KubernetesController.{AddNode, RemoveNode}
 import io.ticofab.akkaclusterkubernetes.actor.RateChecker.EvaluateRate
 import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, NewJobs}
+import io.ticofab.akkaclusterkubernetes.actor.scaling.{AddNode, RemoveNode}
 
 import scala.collection.immutable.Queue
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RateChecker(k8sController: ActorRef) extends Actor {
+class RateChecker(scalingController: ActorRef) extends Actor with ActorLogging {
   implicit val as = context.system
   val settings = ActorMaterializerSettings(as).withSupervisionStrategy(_ => Supervision.Restart)
   implicit val am = ActorMaterializer()
 
-  println("creating rate checker")
+  log.debug("Rate checker starting")
 
   // the router
   val workerRouter = context.actorOf(Router(), "router")
@@ -38,13 +38,13 @@ class RateChecker(k8sController: ActorRef) extends Actor {
 
     case Init =>
       // son is ready!
-      println("son is ready")
+      log.debug("son is ready")
       workerRouter ! NewJobs(List(jobs.head._1))
       jobs = jobs.drop(1)
 
     case Ack(jobResults, availableWorkers) =>
       // we can send more jobs!
-      println(s"received ack for ${jobResults.size} jobs, available workers: $availableWorkers")
+      log.debug(s"received ack for ${jobResults.size} jobs, available workers: $availableWorkers")
       // TODO: filter out failed jobs
       completedJobs ++= jobResults.map(jr => (jr.job, LocalDateTime.now))
       workerRouter ! NewJobs(jobs.take(availableWorkers).map(_._1).toList)
@@ -64,21 +64,21 @@ class RateChecker(k8sController: ActorRef) extends Actor {
       // we need rate to be slightly above 1.0, say between 1.0 and 1.2
       if (rate < 1.0) {
         // there are more incoming jobs than processing speed ---> add node
-        k8sController ! AddNode
+        scalingController ! AddNode
       } else if (rate > 1.2) {
         // there is too much processing power ---> remove node
-        k8sController ! RemoveNode
+        scalingController ! RemoveNode
       }
 
-      println(s"${self.path.name}, jobs in queue: ${jobs.size}")
-      println(s"${self.path.name}, processing rate: $rate")
+      log.debug("Rate checker, jobs in queue: {}", jobs.size)
+      log.debug("Rate checker, processing rate: {}", rate)
   }
 
 }
 
 object RateChecker {
 
-  def apply(k8sController: ActorRef): Props = Props(new RateChecker(k8sController))
+  def apply(scalingController: ActorRef): Props = Props(new RateChecker(scalingController))
 
   case object EvaluateRate
 

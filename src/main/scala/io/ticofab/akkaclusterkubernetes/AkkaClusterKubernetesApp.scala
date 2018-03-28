@@ -1,23 +1,23 @@
 package io.ticofab.akkaclusterkubernetes
 
 import akka.actor.{ActorSystem, Props}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.LazyLogging
 import io.ticofab.akkaclusterkubernetes.actor.Supervisor
+import io.ticofab.akkaclusterkubernetes.config.Config
 
-
-object AkkaClusterKubernetesApp extends App {
+object AkkaClusterKubernetesApp extends App with LazyLogging {
 
   // define a type alias to be used through out
   type Job = String
 
   implicit val as = ActorSystem("akka-cluster-kubernetes")
-  val roles = ConfigFactory.load().getStringList("akka.cluster.roles")
-  println(s"roles=${roles}")
+  val roles = Config.cluster.roles
+  logger.debug(s"roles = $roles")
   if (roles.contains("seed")) {
-    println("This node is a seed node")
+    logger.debug("This node is a seed node")
     as.actorOf(Props(new Supervisor), "supervisor")
   } else {
-    println("This node is a worker node")
+    logger.debug("This node is a worker node")
   }
 
   /*
