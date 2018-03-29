@@ -1,6 +1,6 @@
 package io.ticofab.akkaclusterkubernetes.actor.scaling
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorLogging, Props}
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.extensions.StatefulSetSpecBuilder
 import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernetesClient}
@@ -14,7 +14,7 @@ import scala.collection.JavaConverters
 /**
   * This guy knows the K8S ways, while the rest of the app is K8S-agnostic.
   */
-class KubernetesController extends Actor {
+class KubernetesController extends Actor with ActorLogging {
 
   val client: NamespacedKubernetesClient = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
   val role = "worker"
@@ -23,7 +23,7 @@ class KubernetesController extends Actor {
   override def postStop(): Unit = {
     super.postStop()
 
-    println("Stopping controller - deleting all workers")
+    log.debug("Stopping controller - deleting all workers")
 
     client.apps.statefulSets().withName(statefulSetName).delete()
   }
@@ -32,7 +32,7 @@ class KubernetesController extends Actor {
 
     case AddNode =>
 
-      println("AddNode")
+      log.debug("AddNode")
 
       val apps = client.apps.statefulSets.withName(statefulSetName)
 
@@ -46,7 +46,7 @@ class KubernetesController extends Actor {
         val replicas = apps.get.getSpec.getReplicas + 1
 
         if (replicas < 5) {
-          println(s"Scaling up StatefulSet $statefulSetName to $replicas replicas")
+          log.debug("Scaling up StatefulSet {} to {} replicas", statefulSetName, $replicas)
 
           apps.scale(replicas)
         } else {
@@ -67,7 +67,7 @@ class KubernetesController extends Actor {
       }
 
     case RemoveNode =>
-      println("RemoveNode")
+      log.debug("RemoveNode")
 
       val apps = client.apps.statefulSets.withName(statefulSetName)
 
@@ -78,16 +78,11 @@ class KubernetesController extends Actor {
         val replicas = apps.get.getSpec.getReplicas - 1
 
         if (replicas >= 1) {
-          println(s"Scaling down StatefulSet $statefulSetName to $replicas replicas")
-
+          log.debug("Scaling down StatefulSet {} to {} replicas", statefulSetName, replicas)
           apps.scale(replicas)
+        } else log.debug("Only one replica remains in the StatefulSet - not scaling down")
 
-        } else {
-          println("Only one replica remains in the StatefulSet - not scaling down")
-        }
-      } else {
-        println("Statefulset doesn't exist, not scaling down")
-      }
+      } else log.debug("Statefulset doesn't exist, not scaling down")
 
 
   }

@@ -17,11 +17,23 @@ class Supervisor extends Actor with ActorLogging {
 
   // create actors
   val scalingController =
-    if (Config.kubernetes.`use-kubernetes`) context.actorOf(KubernetesController(), "k8s-controller")
-    else context.actorOf(LocalController())
+    if (Config.kubernetes.`use-kubernetes`) {
+      log.debug("creating kubernetes controller")
+      context.actorOf(KubernetesController(), "k8s-controller")
+    } else {
+      log.debug("creating local controller")
+      context.actorOf(LocalController())
+    }
 
-  val rateChecker = context.actorOf(RateChecker(scalingController), "rateChecker")
-  context.actorOf(Props(new InputSource(rateChecker)), "inputSource")
+  // the router
+  val router = context.actorOf(Router(scalingController), "router")
+
+  // the tunable source of jobs
+  context.actorOf(InputSource(router)), "inputSource")
 
   override def receive = Actor.emptyBehavior
+}
+
+object Supervisor {
+  def apply(): Props = Props(new Supervisor)
 }

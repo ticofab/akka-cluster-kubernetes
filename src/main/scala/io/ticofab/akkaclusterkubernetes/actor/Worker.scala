@@ -1,19 +1,11 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import akka.actor.{Actor, ActorLogging}
+import io.ticofab.akkaclusterkubernetes.actor.Router.JobCompleted
 
-import akka.Done
-import akka.actor.Actor
-import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
-import io.ticofab.akkaclusterkubernetes.actor.Router.JobResult
+class Worker extends Actor with ActorLogging {
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
-class Worker extends Actor {
-
-  println(s"creating worker ${self.path.name}")
+  log.info(s"creating worker {}", self.path.name)
 
   // starts a little server to serve an "alive" endpoint
   //  implicit val as = context.system
@@ -25,18 +17,14 @@ class Worker extends Actor {
   //  Http().bindAndHandle(routes, "0.0.0.0", 8080)
 
   override def receive = {
+
     case job: Job =>
-      println(s"${self.path.name}, ${LocalDateTime.now.format(DateTimeFormatter.ISO_LOCAL_TIME)}, received $job")
-      val originalSender = sender
-      val tb = System.currentTimeMillis
-      executeJob(job).onComplete(_ => {
-        val et = System.currentTimeMillis - tb
-        println(s"${self.path.name}, evaluated task in $et milliseconds.")
-        originalSender ! JobResult(job, Some(Done))
-      })
+      log.debug("{}, received job {}", self.path.name, job.number)
+
+      // Simulate a CPU-intensive workload that takes ~2000 milliseconds
+      val start = System.currentTimeMillis()
+      while ((System.currentTimeMillis() - start) < 2000) {}
+      sender ! JobCompleted(job.number)
   }
 
-  def executeJob(job: Job) = Future {
-    Thread.sleep(400)
-  }
 }

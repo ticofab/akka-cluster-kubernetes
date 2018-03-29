@@ -1,27 +1,34 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
-import akka.actor.{Actor, ActorRef}
+import java.time.LocalDateTime
+
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
+import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.util.Random
 
 /**
   * Actor to provide a source of input messages for the recipient
   *
   * @param target The recipient of our messages
   */
-class InputSource(target: ActorRef) extends Actor {
+class InputSource(target: ActorRef) extends Actor with ActorLogging {
+
+  log.info("input source starting, target it {}", target.path.name)
 
   implicit val as = context.system
+  var counter = 0
   val sendingFunction: Runnable = () => {
-    target ! Random.alphanumeric.filter(_.isLetter).take(5).mkString
+    counter += 1
+    val now = LocalDateTime.now
+    target ! Job(counter, now, self)
   }
 
-  var cancellableSchedule = as.scheduler.schedule(0.second, 200.milliseconds, sendingFunction)
+  var cancellableSchedule = as.scheduler.schedule(0.second, 1000.milliseconds, sendingFunction)
 
   // http server to control the rate per second of inputs. for instance:
   // curl http://0.0.0.0:8080/4   --> rate will be 4 inputs/s, once every 250 ms
@@ -41,4 +48,11 @@ class InputSource(target: ActorRef) extends Actor {
   Http().bindAndHandle(routes, "0.0.0.0", 8080)
 
   override def receive = Actor.emptyBehavior
+}
+
+object InputSource {
+  def apply(target: ActorRef): Props = Props(new InputSource(target))
+
+  case class Job(number: Int, creationDate: LocalDateTime, sender: ActorRef)
+
 }

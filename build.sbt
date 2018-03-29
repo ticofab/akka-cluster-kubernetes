@@ -18,6 +18,8 @@ libraryDependencies ++= {
     "io.fabric8" % "kubernetes-api" % "3.0.8",
 
     // logging
+    "ch.qos.logback" % "logback-classic" % "1.2.3",
+    "com.typesafe.akka" %% "akka-slf4j" % akkaVersion,
     "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
 
     // ficus for config

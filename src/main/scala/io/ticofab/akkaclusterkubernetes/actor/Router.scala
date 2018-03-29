@@ -1,78 +1,69 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
-import akka.Done
-import akka.actor.{Actor, ActorLogging, Props}
+import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.cluster.Cluster
-import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, UnreachableMember}
-import akka.cluster.routing.{ClusterRouterPool, ClusterRouterPoolSettings}
-import akka.pattern.ask
-import akka.routing.RoundRobinPool
-import io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesApp.Job
-import io.ticofab.akkaclusterkubernetes.actor.Router.{Ack, Init, JobResult, NewJobs}
+import akka.cluster.ClusterEvent.{MemberEvent, MemberUp, UnreachableMember}
+import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
+import akka.routing.RoundRobinGroup
+import akka.stream.ActorMaterializer
+import io.ticofab.akkaclusterkubernetes.actor.Router.JobCompleted
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
 
-class Router extends Actor with ActorLogging {
+class Router(scalingController: ActorRef) extends Actor with ActorLogging {
+
+  implicit val ec = context.dispatcher
+  implicit val am = ActorMaterializer()(context)
 
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
 
-  // the router pool
-  val workerRouter = context.actorOf(
-    ClusterRouterPool(
-      RoundRobinPool(0),
-      ClusterRouterPoolSettings(
+  // TODO
+  // scalingController ! AddNode
+
+  // the router
+  val workersPool = context.actorOf(
+    ClusterRouterGroup(
+      RoundRobinGroup(Nil),
+      ClusterRouterGroupSettings(
         totalInstances = 100,
-        maxInstancesPerNode = 1,
-        allowLocalRoutees = false)
-    ).props(Props[Worker]),
+        routeesPaths = List("/user/worker"),
+        allowLocalRoutees = false)).props(),
     name = "workerRouter")
 
-  override def receive = empty
+  // the queue of jobs to run
+  val jobs = ListBuffer.empty[Job]
 
-  def empty: Receive = {
+  def submitNextJob(): Unit =
+    jobs.headOption.foreach(
+      job => {
+        workersPool ! job
+        jobs -= job
+      })
+
+  override def receive = {
+
     case MemberUp(m) =>
-      log.debug(s"the first member joined: ${m.address.toString}")
-      context become ready(1)
-      context.system.scheduler.scheduleOnce(1.second, context.parent, Init)
-  }
+      // wait a little and trigger a new job
+      log.debug(s"a member joined: ${m.address.toString}")
+      context.system.scheduler.scheduleOnce(1.second, () => submitNextJob())
 
-  def ready(workers: Int): Receive = {
-    // a member joined the cluster
-    case MemberUp(m) =>
-      log.debug(s"a new member joined: ${m.address.toString}")
-      context become ready(workers + 1)
+    case job: Job =>
+      // enqueue the new job
+      log.debug("received a new job: {}", job.number)
+      jobs += job
 
-    // a member left the cluster
-    case MemberExited(m) => context become (if (workers == 1) empty else ready(workers - 1))
+    case jobCompleted: JobCompleted =>
+      // a job has been completed: trigger the next one
+      log.debug("job {} completed", jobCompleted.number)
+      submitNextJob()
 
-    // we received new jobs to execute
-    case NewJobs(jobs) =>
-      // println(s"received ${jobs.size} jobs")
-      val ackRecipient = sender
-      val seq = Future.sequence(jobs.map(job => (workerRouter ? job) (3.seconds).mapTo[JobResult]))
-      seq onComplete {
-        case Success(res) => ackRecipient ! Ack(res, workers)
-        case Failure(error) => log.error(error, "error while processing jobs")
-      }
   }
 }
 
 object Router {
-  def apply(): Props = Props(new Router)
+  def apply(scalingController: ActorRef): Props = Props(new Router(scalingController))
 
-  case object Init
-
-  case class NewJobs(jobs: List[Job])
-
-  case class JobsList(jobs: List[Job])
-
-  case class JobResult(job: Job, outcome: Option[Done])
-
-  case class Ack(jobsCompleted: List[JobResult], availableWorkers: Int)
-
-  case object Complete
+  case class JobCompleted(number: Int)
 
 }
