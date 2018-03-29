@@ -9,7 +9,7 @@ object AkkaClusterKubernetesApp extends App with LazyLogging {
 
   implicit val as = ActorSystem("akka-cluster-kubernetes")
   val roles = Config.cluster.roles
-  
+
   if (roles.contains("seed")) {
 
     logger.debug("This node is a seed node")

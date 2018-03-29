@@ -1,6 +1,7 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.actor.{Actor, ActorLogging}
+import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.JobCompleted
 
 class Worker extends Actor with ActorLogging {

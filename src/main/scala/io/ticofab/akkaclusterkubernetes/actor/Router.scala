@@ -6,6 +6,7 @@ import akka.cluster.ClusterEvent.{MemberEvent, MemberUp, UnreachableMember}
 import akka.cluster.routing.{ClusterRouterGroup, ClusterRouterGroupSettings}
 import akka.routing.RoundRobinGroup
 import akka.stream.ActorMaterializer
+import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.JobCompleted
 
 import scala.collection.mutable.ListBuffer

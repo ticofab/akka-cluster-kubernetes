@@ -29,7 +29,7 @@ class Supervisor extends Actor with ActorLogging {
   val router = context.actorOf(Router(scalingController), "router")
 
   // the tunable source of jobs
-  context.actorOf(InputSource(router)), "inputSource")
+  context.actorOf(InputSource(router), "inputSource")
 
   override def receive = Actor.emptyBehavior
 }

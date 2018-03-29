@@ -46,7 +46,7 @@ class KubernetesController extends Actor with ActorLogging {
         val replicas = apps.get.getSpec.getReplicas + 1
 
         if (replicas < 5) {
-          log.debug("Scaling up StatefulSet {} to {} replicas", statefulSetName, $replicas)
+          log.debug("Scaling up StatefulSet {} to {} replicas", statefulSetName, replicas)
 
           apps.scale(replicas)
         } else {
