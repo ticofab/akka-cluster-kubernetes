@@ -2,7 +2,7 @@ package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{Actor, ActorLogging, OneForOneStrategy, Props}
-import io.ticofab.akkaclusterkubernetes.actor.scaling.{KubernetesController, LocalController}
+import io.ticofab.akkaclusterkubernetes.actor.scaling.{DummyScalingController, KubernetesController}
 import io.ticofab.akkaclusterkubernetes.config.Config
 
 class Supervisor extends Actor with ActorLogging {
@@ -15,15 +15,10 @@ class Supervisor extends Actor with ActorLogging {
       Restart
   }
 
-  // create actors
+  // create scaling controller
   val scalingController =
-    if (Config.kubernetes.`use-kubernetes`) {
-      log.debug("creating kubernetes controller")
-      context.actorOf(KubernetesController(), "k8s-controller")
-    } else {
-      log.debug("creating local controller")
-      context.actorOf(LocalController())
-    }
+    if (Config.kubernetes.`use-kubernetes`) context.actorOf(KubernetesController(), "k8s-controller")
+    else context.actorOf(Props(new DummyScalingController))
 
   // the router
   val router = context.actorOf(Router(scalingController), "router")

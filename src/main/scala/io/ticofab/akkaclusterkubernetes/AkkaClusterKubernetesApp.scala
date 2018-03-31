@@ -11,15 +11,10 @@ object AkkaClusterKubernetesApp extends App with LazyLogging {
   val roles = Config.cluster.roles
 
   if (roles.contains("seed")) {
-
     logger.debug("This node is a seed node")
     as.actorOf(Supervisor(), "supervisor")
-
   } else {
-
-    logger.debug("This node is a worker node")
-    as.actorOf(Props[Worker], "worker")
-
+    logger.debug("This node is a worker")
   }
 
   /*

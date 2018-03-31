@@ -28,7 +28,7 @@ class InputSource(target: ActorRef) extends Actor with ActorLogging {
     target ! Job(counter, now, self)
   }
 
-  var cancellableSchedule = as.scheduler.schedule(0.second, 1000.milliseconds, sendingFunction)
+  var cancellableSchedule = as.scheduler.schedule(0.second, 500.milliseconds, sendingFunction)
 
   // http server to control the rate per second of inputs. for instance:
   // curl http://0.0.0.0:8080/4   --> rate will be 4 inputs/s, once every 250 ms
