@@ -2,7 +2,7 @@ package io.ticofab.akkaclusterkubernetes.actor.scaling
 
 import akka.actor.{Actor, ActorLogging, Props}
 import io.fabric8.kubernetes.api.model._
-import io.fabric8.kubernetes.api.model.extensions.StatefulSetSpecBuilder
+import io.fabric8.kubernetes.api.model.extensions.DeploymentSpecBuilder
 import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernetesClient}
 
 import scala.collection.JavaConverters
@@ -18,14 +18,14 @@ class KubernetesController extends Actor with ActorLogging {
 
   val client: NamespacedKubernetesClient = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
   val role = "worker"
-  val statefulSetName = s"akka-$role"
+  val workerDeploymentName = s"akka-$role"
 
   override def postStop(): Unit = {
     super.postStop()
 
     log.debug("Stopping controller - deleting all workers")
 
-    client.apps.statefulSets().withName(statefulSetName).delete()
+    client.extensions().deployments().withName(workerDeploymentName).delete()
   }
 
   override def receive = {
@@ -34,63 +34,69 @@ class KubernetesController extends Actor with ActorLogging {
 
       log.debug("AddNode")
 
-      val apps = client.apps.statefulSets.withName(statefulSetName)
+      val workers = client.extensions.deployments.withName(workerDeploymentName)
 
-      if (apps.get != null) {
+      if (workers.get != null) {
 
-        // scale up the existing stateful set by one node
+        // scale up the existing deployment by one replica
         //        val status = apps.get.getStatus
         //        val currentReplicas = status.getCurrentReplicas
         //        val readyReplicas = status.getReadyReplicas
 
-        val replicas = apps.get.getSpec.getReplicas + 1
+        val replicas = workers.get.getSpec.getReplicas + 1
 
-        if (replicas < 5) {
-          log.debug("Scaling up StatefulSet {} to {} replicas", statefulSetName, replicas)
+        if (replicas < 2) {
+          log.debug(s"Scaling up Deployment $workerDeploymentName to $replicas replicas")
 
-          apps.scale(replicas)
+          workers.scale(replicas)
         } else {
-          println("Can't scale up. Reached maximum number of replicas")
+          log.debug("Can't scale up. Reached maximum number of replicas")
         }
       } else {
 
         // create new stateful set
-        println(s"Creating new stateful set $statefulSetName")
+        log.debug(s"Creating new Deployment $workerDeploymentName")
 
-        val newSetSpec = getNewStatefulSetSpec(role)
-        val nameMetadata = new ObjectMetaBuilder().withName(statefulSetName).build
-        client.apps().statefulSets()
+        val workerSpec = getWorkerSpec(role)
+        val nameMetadata = new ObjectMetaBuilder().withName(workerDeploymentName).build
+        client.extensions().deployments()
           .createNew()
           .withMetadata(nameMetadata)
-          .withSpec(newSetSpec)
+          .withSpec(workerSpec)
           .done
       }
 
     case RemoveNode =>
       log.debug("RemoveNode")
 
-      val apps = client.apps.statefulSets.withName(statefulSetName)
+      val workers = client.extensions.deployments.withName(workerDeploymentName)
 
-      if (apps.get != null) {
+      if (workers.get != null) {
 
-        // scale up the existing stateful set by one node
-
-        val replicas = apps.get.getSpec.getReplicas - 1
+        val replicas = workers.get.getSpec.getReplicas - 1
 
         if (replicas >= 1) {
-          log.debug("Scaling down StatefulSet {} to {} replicas", statefulSetName, replicas)
-          apps.scale(replicas)
-        } else log.debug("Only one replica remains in the StatefulSet - not scaling down")
 
-      } else log.debug("Statefulset doesn't exist, not scaling down")
+          log.debug(s"Scaling down Deployment $workerDeploymentName to $replicas replicas")
+
+          workers.scale(replicas)
+
+        } else {
+          log.debug("Only one replica remains in the Deployment - not scaling down")
+        }
+      } else {
+        log.debug("Deployment doesn't exist, not scaling down")
+      }
 
 
   }
 
-  def getNewStatefulSetSpec(role: String) = {
+  def getWorkerSpec(role: String) = {
 
     val envVars = JavaConverters.seqAsJavaList(
-      List[EnvVar](new EnvVarBuilder().withName("ROLE").withValue("worker").build))
+      List[EnvVar](new EnvVarBuilder().withName("ROLE").withValue("worker").build(),
+                   new EnvVarBuilder().withName("POD_IP").withNewValueFrom().withFieldRef(
+                      new ObjectFieldSelectorBuilder().withFieldPath("status.podIP").build()).endValueFrom().build()))
 
     val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role, "cluster" -> "cluster1"))
 
@@ -111,7 +117,7 @@ class KubernetesController extends Actor with ActorLogging {
 
     val container = new ContainerBuilder()
       .withName(s"akka-$role")
-      .withImage(s"eu.gcr.io/adam-akka/akka-cluster-kubernetes:" + System.getenv("version"))
+      .withImage(System.getenv("WORKER_IMAGE"))
       .withImagePullPolicy("Always")
       // .withReadinessProbe(readinessProbe)
       .withEnv(envVars)
@@ -132,11 +138,9 @@ class KubernetesController extends Actor with ActorLogging {
       .withSpec(spec)
       .build
 
-    new StatefulSetSpecBuilder()
+    new DeploymentSpecBuilder()
       .withSelector(labelSelector)
-      .withPodManagementPolicy("Parallel")
       .withReplicas(1)
-      .withServiceName("akka")
       .withTemplate(podTemplate)
       .build
   }
