@@ -10,6 +10,7 @@ import akka.routing.RoundRobinPool
 import akka.stream.ActorMaterializer
 import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.{EvaluateRate, JobCompleted}
+import io.ticofab.akkaclusterkubernetes.actor.scaling.{AddNode, RemoveNode}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
@@ -20,9 +21,6 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
   implicit val am = ActorMaterializer()(context)
 
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
-
-  // TODO
-  //scalingController ! AddNode
 
   // the router
   val workersPool = context.actorOf(
@@ -97,30 +95,63 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   possible to take action:                {}", possibleToTakeAction)
 
       if (possibleToTakeAction) {
+
         if (difference > 0) {
+
+          // we are receiving more jobs than we can handle.
+
           log.debug("we need more power, add node")
+          scalingController ! AddNode
           lastActionTaken = now
+
         } else if (difference == 0) {
+
+          // we are burning as much as it comes.
+
+          // but do we have older jobs to burn?
           if (waitingJobs.size > singleWorkerPower) {
             log.debug("we're burning as much as we receive, but we have a long queue. add worker.")
+            scalingController ! AddNode
             lastActionTaken = now
+          } else {
+            // it seems we're at a perfect balance!
+            log.debug("we're burning as much as we receive, and it seems we don't need more power. Excellent!.")
           }
+
         } else if (difference < 0) {
+
+          // we are burning down jobs!
+
           if (waitingJobs.size <= singleWorkerPower) {
-            if (Math.abs(difference) < singleWorkerPower) {
+
+            // we are close to the optimal.
+
+            // did we strike a balance or do we have too much power?
+            if (Math.abs(difference) <= singleWorkerPower) {
               log.debug("we have a little more processing power than we need. stay like this.")
             } else {
               log.debug("we have too much power for what we need. remove worker")
+              scalingController ! RemoveNode
               lastActionTaken = now
             }
+
           } else {
+
+            // we are burning down stuff and need to keep burning.
+
+            // are we burning fast enough?
             if (waitingJobs.size > singleWorkerPower * 5) {
+
               log.debug("we are burning the old queue but not fast enough. add worker.")
+              scalingController ! AddNode
               lastActionTaken = now
+
             } else {
-              log.debug("we more power than we need but still burning down old jobs. stay like this.")
+              log.debug("we have more power than we need but still burning down old jobs. stay like this.")
             }
+
           }
+
         }
 
       }
