@@ -3,14 +3,13 @@ package io.ticofab.akkaclusterkubernetes.actor
 import java.time.LocalDateTime
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import akka.cluster.ClusterEvent.{MemberEvent, MemberUp, UnreachableMember}
+import akka.cluster.ClusterEvent.{MemberEvent, MemberExited, MemberUp, UnreachableMember}
 import akka.cluster.routing.ClusterRouterPool
 import akka.cluster.{Cluster, routing}
 import akka.routing.RoundRobinPool
 import akka.stream.ActorMaterializer
 import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Router.{EvaluateRate, JobCompleted}
-import io.ticofab.akkaclusterkubernetes.actor.scaling.AddNode
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
@@ -23,7 +22,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
   Cluster(context.system).subscribe(self, classOf[MemberEvent], classOf[UnreachableMember])
 
   // TODO
-  scalingController ! AddNode
+  //scalingController ! AddNode
 
   // the router
   val workersPool = context.actorOf(
@@ -33,14 +32,12 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
         totalInstances = 100,
         maxInstancesPerNode = 1,
         allowLocalRoutees = false)
-    ).props(Props[Worker]),
+    ).props(Worker()),
     name = "workerRouter")
 
   // the queue of jobs to run
   val waitingJobs = ListBuffer.empty[Job]
   val jobsArrivedInWindow = ListBuffer.empty[Job]
-  var previouslyWaitingJobs: Int = 0
-  val submittedJobs = ListBuffer.empty[Job]
   val jobsCompletedInWindows = ListBuffer.empty[JobCompleted]
 
   def submitNextJob(): Unit =
@@ -48,19 +45,27 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       job => {
         workersPool ! job
         waitingJobs -= job
-        submittedJobs += job
       })
 
   val evaluationWindow = 10.seconds
-  var previousDelta = 0
+  val singleWorkerPower = (Worker.jobsRatePerSecond * evaluationWindow.toSeconds).toInt
   context.system.scheduler.schedule(evaluationWindow, evaluationWindow, self, EvaluateRate)
 
-  override def receive = {
+  var workers: Int = 0
+  var lastActionTaken: LocalDateTime = LocalDateTime.now minusSeconds (evaluationWindow.toSeconds * 3)
+
+  override def receive: Receive = {
 
     case MemberUp(m) =>
       // wait a little and trigger a new job
       log.debug(s"a member joined: ${m.address.toString}")
+      workers += 1
       context.system.scheduler.scheduleOnce(1.second, () => submitNextJob())
+
+    // a member left the cluster
+    case MemberExited(m) => workers -= 1
+
+    case UnreachableMember(m) => workers -= 1
 
     case job: Job =>
       // enqueue the new job
@@ -71,67 +76,58 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       // a job has been completed: trigger the next one
       log.debug("job {} completed ({})", job.number, job.completer)
       jobsCompletedInWindows += job
-      submitNextJob()
+      if (workers > 0) submitNextJob()
 
     case EvaluateRate =>
       val now = LocalDateTime.now
-      val tenSecondsAgo = now minusSeconds evaluationWindow.toSeconds
-      val recentWaitingJobs = waitingJobs filter { job => job.creationDate.isAfter(tenSecondsAgo) }
-      val recentSubmittedJobs = submittedJobs filter { job => job.creationDate.isAfter(tenSecondsAgo) }
       val arrivedCompletedDelta = jobsArrivedInWindow.size - jobsCompletedInWindows.size
 
-      val rate = jobsCompletedInWindows.size.toDouble / (recentWaitingJobs.size.toDouble + recentSubmittedJobs.size.toDouble)
+      val workerPoolPower = singleWorkerPower * workers
+      val difference = jobsArrivedInWindow.size - workerPoolPower
+      val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds (evaluationWindow.toSeconds * 3))
+
       log.debug("evaluating rate:")
       log.debug("   waiting jobs:                           {}", waitingJobs.size)
       log.debug("   jobs arrived in window                  {}", jobsArrivedInWindow.size)
       log.debug("   arrivedCompletedDelta                   {}", arrivedCompletedDelta)
-      log.debug("   previousDelta                           {}", previousDelta)
-      log.debug("   new jobs waiting added in window:       {}", waitingJobs.size - previouslyWaitingJobs)
-      log.debug("   jobs submitted in window:               {}", recentSubmittedJobs.size)
       log.debug("   jobs completed in window:               {}", jobsCompletedInWindows.size)
+      log.debug("   workers amount:                         {}", workers)
+      log.debug("   workers power:                          {}", workerPoolPower)
+      log.debug("   arrived vs power difference:            {}", difference)
+      log.debug("   possible to take action:                {}", possibleToTakeAction)
 
-      // we need rate to be slightly above 1.0, say between 1.0 and 1.2
-      if (arrivedCompletedDelta > 0) {
-        log.debug("adding node")
-        // there are more incoming jobs than processing speed ---> add node
-        // scalingController ! AddNode
-      } else if (arrivedCompletedDelta == 0) {
-        if (waitingJobs.size > 0) {
-          if (previousDelta < 0 && recentSubmittedJobs.size > 0) {
-            log.debug("coming from a burndown situation, removing node")
-          } else if (recentSubmittedJobs.size == 0) {
-            // we're burning exactly what comes, increase burning
-            log.debug("we're burning exactly what comes, adding node")
+      if (possibleToTakeAction) {
+        if (difference > 0) {
+          log.debug("we need more power, add node")
+          lastActionTaken = now
+        } else if (difference == 0) {
+          if (waitingJobs.size > singleWorkerPower) {
+            log.debug("we're burning as much as we receive, but we have a long queue. add worker.")
+            lastActionTaken = now
+          }
+        } else if (difference < 0) {
+          if (waitingJobs.size <= singleWorkerPower) {
+            if (Math.abs(difference) < singleWorkerPower) {
+              log.debug("we have a little more processing power than we need. stay like this.")
+            } else {
+              log.debug("we have too much power for what we need. remove worker")
+              lastActionTaken = now
+            }
+          } else {
+            if (waitingJobs.size > singleWorkerPower * 5) {
+              log.debug("we are burning the old queue but not fast enough. add worker.")
+              lastActionTaken = now
+            } else {
+              log.debug("we more power than we need but still burning down old jobs. stay like this.")
+            }
           }
         }
-        // there is too much processing power ---> remove node
-        // scalingController ! RemoveNode
-      } else {
-        // delta < 0
-        val windowsToZero = waitingJobs.size / Math.abs(arrivedCompletedDelta)
-        log.debug("we're burning down. At this rate it will take about {} windows to complete", windowsToZero)
-        if (windowsToZero > 10) {
-          log.debug("adding node")
-        }
+
       }
 
-      previouslyWaitingJobs = waitingJobs.size
-      previousDelta = arrivedCompletedDelta
       jobsArrivedInWindow.clear()
       jobsCompletedInWindows.clear()
 
-
-    // TODO:
-    // if there are workers to consume all incoming messages, the rate will be 1.0. But we still have way too many
-    // workers than necessary. So maybe the threshold to scale up is if we are below 1.2 and scale up if b
-    // TODO: just think about the rate taking all cases into consideration
-
-    // TODO: semplification to introduce knowlledge.
-    // knowledge of the workers burndown rate
-    // knowledge of the time it takes to spin up and down a worker
-    // then I can calculate the power that I need and simply wait for a little bit before spinning up more machines.
-    // or at that point I directly tell to spin up multiple nodes at one time?
-    
   }
 }
 
