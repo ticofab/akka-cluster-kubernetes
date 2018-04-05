@@ -7,8 +7,6 @@ import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernet
 
 import scala.collection.JavaConverters
 
-// TODO: tune how fast workers are created
-// TODO: insert switch to not use kubernetes
 // TODO: provide some readiness probe
 
 /**

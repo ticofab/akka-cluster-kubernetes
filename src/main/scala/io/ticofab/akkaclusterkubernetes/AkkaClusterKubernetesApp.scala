@@ -1,8 +1,8 @@
 package io.ticofab.akkaclusterkubernetes
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import com.typesafe.scalalogging.LazyLogging
-import io.ticofab.akkaclusterkubernetes.actor.{Supervisor, Worker}
+import io.ticofab.akkaclusterkubernetes.actor.Supervisor
 import io.ticofab.akkaclusterkubernetes.config.Config
 
 object AkkaClusterKubernetesApp extends App with LazyLogging {

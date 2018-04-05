@@ -61,9 +61,9 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       context.system.scheduler.scheduleOnce(1.second, () => submitNextJob())
 
     // a member left the cluster
-    case MemberExited(m) => workers -= 1
+    case MemberExited(_) => workers -= 1
 
-    case UnreachableMember(m) => workers -= 1
+    case UnreachableMember(_) => workers -= 1
 
     case job: Job =>
       // enqueue the new job
