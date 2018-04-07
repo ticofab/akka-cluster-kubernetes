@@ -33,6 +33,18 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
     ).props(Worker()),
     name = "workerRouter")
 
+  /*
+      ClusterRouterGroup(
+      RoundRobinGroup(Nil),
+      ClusterRouterGroupSettings(
+        totalInstances = 100,
+        routeesPaths = List("/user/worker"),
+        allowLocalRoutees = false)).props(),
+    name = "workerRouter")
+   */
+
+
+
   // the queue of jobs to run
   val waitingJobs = ListBuffer.empty[Job]
   val jobsArrivedInWindow = ListBuffer.empty[Job]

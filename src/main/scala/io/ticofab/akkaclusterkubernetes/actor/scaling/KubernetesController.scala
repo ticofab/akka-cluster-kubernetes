@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorLogging, Props}
 import io.fabric8.kubernetes.api.model._
 import io.fabric8.kubernetes.api.model.extensions.DeploymentSpecBuilder
 import io.fabric8.kubernetes.client.{DefaultKubernetesClient, NamespacedKubernetesClient}
+import io.ticofab.akkaclusterkubernetes.config.Config
 
 import scala.collection.JavaConverters
 
@@ -15,8 +16,7 @@ import scala.collection.JavaConverters
 class KubernetesController extends Actor with ActorLogging {
 
   val client: NamespacedKubernetesClient = new DefaultKubernetesClient().inNamespace(System.getenv("namespace"))
-  val role = "worker"
-  val workerDeploymentName = s"akka-$role"
+  val workerDeploymentName = s"akka-worker"
 
   override def postStop(): Unit = {
     super.postStop()
@@ -41,21 +41,20 @@ class KubernetesController extends Actor with ActorLogging {
         //        val currentReplicas = status.getCurrentReplicas
         //        val readyReplicas = status.getReadyReplicas
 
-        val replicas = workers.get.getSpec.getReplicas + 1
+        val currentReplicas = workers.get.getSpec.getReplicas
 
-        if (replicas < 2) {
-          log.debug(s"Scaling up Deployment $workerDeploymentName to $replicas replicas")
-
-          workers.scale(replicas)
+        if ((currentReplicas + 1) < Config.kubernetes.`max-replicas`) {
+          log.debug(s"We currently have {}, scaling up Deployment $workerDeploymentName to {} replicas", currentReplicas, currentReplicas + 1)
+          workers.scale(currentReplicas + 1)
         } else {
-          log.debug("Can't scale up. Reached maximum number of replicas")
+          log.debug("Can't scale up. Reached maximum number of {} replicas.", currentReplicas)
         }
       } else {
 
         // create new stateful set
         log.debug(s"Creating new Deployment $workerDeploymentName")
 
-        val workerSpec = getWorkerSpec(role)
+        val workerSpec = getWorkerSpec
         val nameMetadata = new ObjectMetaBuilder().withName(workerDeploymentName).build
         client.extensions().deployments()
           .createNew()
@@ -86,15 +85,16 @@ class KubernetesController extends Actor with ActorLogging {
         log.debug("Deployment doesn't exist, not scaling down")
       }
 
-
   }
 
-  def getWorkerSpec(role: String) = {
+  def getWorkerSpec = {
 
+    val role = "worker"
     val envVars = JavaConverters.seqAsJavaList(
-      List[EnvVar](new EnvVarBuilder().withName("ROLE").withValue("worker").build(),
-                   new EnvVarBuilder().withName("POD_IP").withNewValueFrom().withFieldRef(
-                      new ObjectFieldSelectorBuilder().withFieldPath("status.podIP").build()).endValueFrom().build()))
+      List[EnvVar](
+        new EnvVarBuilder().withName("ROLES.1").withValue(role).build(),
+        new EnvVarBuilder().withName("HOSTNAME").withNewValueFrom().withFieldRef(
+          new ObjectFieldSelectorBuilder().withFieldPath("status.podIP").build()).endValueFrom().build()))
 
     val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role, "cluster" -> "cluster1"))
 

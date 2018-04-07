@@ -14,7 +14,8 @@ object Config {
   case class Cluster(`seed-nodes`: List[String],
                      roles: List[String])
 
-  case class Kubernetes(`use-kubernetes`: Boolean)
+  case class Kubernetes(`use-kubernetes`: Boolean,
+                        `max-replicas`: Int)
 
   val config = ConfigFactory.load()
   val remote = config.as[Remote]("akka.remote.netty.tcp")
