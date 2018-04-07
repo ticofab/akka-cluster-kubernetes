@@ -92,8 +92,8 @@ class KubernetesController extends Actor with ActorLogging {
     val role = "worker"
     val envVars = JavaConverters.seqAsJavaList(
       List[EnvVar](
-        new EnvVarBuilder().withName("ROLES.1").withValue(role).build(),
-        new EnvVarBuilder().withName("HOSTNAME").withNewValueFrom().withFieldRef(
+        new EnvVarBuilder().withName("ROLE").withValue(role).build(),
+        new EnvVarBuilder().withName("POD_IP").withNewValueFrom().withFieldRef(
           new ObjectFieldSelectorBuilder().withFieldPath("status.podIP").build()).endValueFrom().build()))
 
     val labels = JavaConverters.mapAsJavaMap(Map("app" -> s"akka-$role", "role" -> role, "cluster" -> "cluster1"))
