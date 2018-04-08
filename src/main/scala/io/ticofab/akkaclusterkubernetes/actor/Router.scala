@@ -44,7 +44,6 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
    */
 
 
-
   // the queue of jobs to run
   val waitingJobs = ListBuffer.empty[Job]
   val jobsArrivedInWindow = ListBuffer.empty[Job]
@@ -97,6 +96,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds (evaluationWindow.toSeconds * 3))
 
       log.debug("evaluating rate:")
+      log.debug("   time:                                   {}", now.getMinute + ":" + now.getSecond)
       log.debug("   waiting jobs:                           {}", waitingJobs.size)
       log.debug("   jobs arrived in window                  {}", jobsArrivedInWindow.size)
       log.debug("   arrivedCompletedDelta                   {}", arrivedCompletedDelta)
@@ -105,6 +105,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   workers power:                          {}", workerPoolPower)
       log.debug("   arrived vs power difference:            {}", difference)
       log.debug("   possible to take action:                {}", possibleToTakeAction)
+      log.debug("   csv {},{},{},{}", now.getMinute + ":" + now.getSecond, waitingJobs.size, arrivedCompletedDelta, workers)
 
       if (possibleToTakeAction) {
 
@@ -152,7 +153,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
             // we are burning down stuff and need to keep burning.
 
             // are we burning fast enough?
-            if (waitingJobs.size > singleWorkerPower * 5) {
+            if (waitingJobs.size > singleWorkerPower * 4) {
 
               log.debug("we are burning the old queue but not fast enough. add worker.")
               scalingController ! AddNode
