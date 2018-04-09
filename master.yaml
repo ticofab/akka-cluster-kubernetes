@@ -27,7 +27,7 @@ spec:
             - name: WORKER_IMAGE
               value: eu.gcr.io/adam-akka/akka-cluster-kubernetes:latest
             - name: USE_KUBERNETES
-              value: "false"
+              value: "true"
             - name: namespace
               valueFrom:
                 fieldRef:
