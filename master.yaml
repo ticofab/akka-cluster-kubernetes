@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: akka-master
@@ -26,6 +26,8 @@ spec:
               value: seed
             - name: WORKER_IMAGE
               value: eu.gcr.io/adam-akka/akka-cluster-kubernetes:latest
+            - name: USE_KUBERNETES
+              value: "false"
             - name: namespace
               valueFrom:
                 fieldRef:
