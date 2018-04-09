@@ -96,7 +96,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds (evaluationWindow.toSeconds * 3))
 
       log.debug("evaluating rate:")
-      log.debug("   time:                                   {}", now.getMinute + ":" + now.getSecond)
+      log.debug("   time:                                   {}", now.toString)
       log.debug("   waiting jobs:                           {}", waitingJobs.size)
       log.debug("   jobs arrived in window                  {}", jobsArrivedInWindow.size)
       log.debug("   arrivedCompletedDelta                   {}", arrivedCompletedDelta)
@@ -105,7 +105,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   workers power:                          {}", workerPoolPower)
       log.debug("   arrived vs power difference:            {}", difference)
       log.debug("   possible to take action:                {}", possibleToTakeAction)
-      log.debug("   csv {},{},{},{}", now.getMinute + ":" + now.getSecond, waitingJobs.size, arrivedCompletedDelta, workers)
+      log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
 
       if (possibleToTakeAction) {
 
