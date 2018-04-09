@@ -26,6 +26,7 @@ class Worker extends Actor with ActorLogging {
       // Simulate a CPU-intensive workload that takes ~2000 milliseconds
       val start = System.currentTimeMillis()
       while ((System.currentTimeMillis() - start) < jobsMillis) {}
+
       sender ! JobCompleted(job.number, self.path.name)
   }
 
