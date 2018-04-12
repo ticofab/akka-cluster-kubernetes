@@ -1,6 +1,7 @@
 package io.ticofab.akkaclusterkubernetes
 
 import akka.actor.ActorSystem
+import akka.cluster.Cluster
 import com.typesafe.scalalogging.LazyLogging
 import io.ticofab.akkaclusterkubernetes.actor.Supervisor
 import io.ticofab.akkaclusterkubernetes.config.Config
@@ -20,6 +21,14 @@ object AkkaClusterKubernetesApp extends App with LazyLogging {
     // enable if using ClusterRoutingGroup
     //as.actorOf(Worker())
   }
+
+  as.registerOnTermination(() => {
+    logger.debug("Received system termination. Leaving cluster.")
+    val cluster = Cluster(as)
+    cluster.registerOnMemberRemoved(() => as.terminate())
+    cluster.leave(cluster.selfAddress)
+  })
+
 
   /*
 
