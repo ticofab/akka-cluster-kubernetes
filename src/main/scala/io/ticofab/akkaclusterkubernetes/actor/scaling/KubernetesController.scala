@@ -34,13 +34,10 @@ class KubernetesController extends Actor with ActorLogging {
 
       val workers = client.extensions.deployments.withName(workerDeploymentName)
 
+      // check if the deployment is there
       if (workers.get != null) {
 
-        // scale up the existing deployment by one replica
-        //        val status = apps.get.getStatus
-        //        val currentReplicas = status.getCurrentReplicas
-        //        val readyReplicas = status.getReadyReplicas
-
+        // scale up the replicas
         val currentReplicas = workers.get.getSpec.getReplicas
 
         if ((currentReplicas + 1) < Config.kubernetes.`max-replicas`) {
@@ -49,9 +46,10 @@ class KubernetesController extends Actor with ActorLogging {
         } else {
           log.debug("Can't scale up. Reached maximum number of {} replicas.", currentReplicas)
         }
+
       } else {
 
-        // create new stateful set
+        // create new deployment
         log.debug(s"Creating new Deployment $workerDeploymentName")
 
         val workerSpec = getWorkerSpec
@@ -70,6 +68,7 @@ class KubernetesController extends Actor with ActorLogging {
 
       if (workers.get != null) {
 
+        // scale the replicas down
         val replicas = workers.get.getSpec.getReplicas - 1
 
         if (replicas >= 1) {
@@ -82,7 +81,10 @@ class KubernetesController extends Actor with ActorLogging {
           log.debug("Only one replica remains in the Deployment - not scaling down")
         }
       } else {
+
+        // nothing to scale down
         log.debug("Deployment doesn't exist, not scaling down")
+
       }
 
   }
@@ -100,24 +102,10 @@ class KubernetesController extends Actor with ActorLogging {
 
     val containerPort = new ContainerPortBuilder().withContainerPort(2551).build()
 
-    // commented out code about the readiness probe for now
-    //
-    //    val httpGet = new HTTPGetActionBuilder()
-    //      .withPath("/")
-    //      .withPort(new IntOrString(8080))
-    //      .build
-    //
-    //    val readinessProbe = new ProbeBuilder()
-    //      .withHttpGet(httpGet)
-    //      .withFailureThreshold(5)
-    //      .withTimeoutSeconds(60)
-    //      .build
-
     val container = new ContainerBuilder()
       .withName(s"akka-$role")
       .withImage(System.getenv("WORKER_IMAGE"))
       .withImagePullPolicy("Always")
-      // .withReadinessProbe(readinessProbe)
       .withEnv(envVars)
       .withPorts(JavaConverters.seqAsJavaList[ContainerPort](List(containerPort)))
       .build

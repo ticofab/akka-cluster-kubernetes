@@ -9,13 +9,13 @@ import akka.cluster.{Cluster, routing}
 import akka.routing.RoundRobinPool
 import akka.stream.ActorMaterializer
 import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
-import io.ticofab.akkaclusterkubernetes.actor.Router.{EvaluateRate, JobCompleted}
+import io.ticofab.akkaclusterkubernetes.actor.Master.{EvaluateRate, JobCompleted}
 import io.ticofab.akkaclusterkubernetes.actor.scaling.{AddNode, RemoveNode}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 
-class Router(scalingController: ActorRef) extends Actor with ActorLogging {
+class Master(scalingController: ActorRef) extends Actor with ActorLogging {
 
   implicit val ec = context.dispatcher
   implicit val am = ActorMaterializer()(context)
@@ -32,17 +32,6 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
         allowLocalRoutees = false)
     ).props(Worker()),
     name = "workerRouter")
-
-  /*
-      ClusterRouterGroup(
-      RoundRobinGroup(Nil),
-      ClusterRouterGroupSettings(
-        totalInstances = 100,
-        routeesPaths = List("/user/worker"),
-        allowLocalRoutees = false)).props(),
-    name = "workerRouter")
-   */
-
 
   // the queue of jobs to run
   val waitingJobs = ListBuffer.empty[Job]
@@ -105,7 +94,7 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   workers power:                          {}", workerPoolPower)
       log.debug("   arrived vs power difference:            {}", difference)
       log.debug("   possible to take action:                {}", possibleToTakeAction)
-      log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
+      //log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
 
       if (possibleToTakeAction) {
 
@@ -175,8 +164,8 @@ class Router(scalingController: ActorRef) extends Actor with ActorLogging {
   }
 }
 
-object Router {
-  def apply(scalingController: ActorRef): Props = Props(new Router(scalingController))
+object Master {
+  def apply(scalingController: ActorRef): Props = Props(new Master(scalingController))
 
   case class JobCompleted(number: Int, completer: String)
 

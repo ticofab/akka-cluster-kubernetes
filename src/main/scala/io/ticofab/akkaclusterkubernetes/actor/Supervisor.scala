@@ -20,11 +20,11 @@ class Supervisor extends Actor with ActorLogging {
     if (Config.kubernetes.`use-kubernetes`) context.actorOf(KubernetesController(), "k8s-controller")
     else context.actorOf(Props(new DummyScalingController))
 
-  // the router
-  val router = context.actorOf(Router(scalingController), "router")
+  // da master
+  val master = context.actorOf(Master(scalingController), "master")
 
   // the tunable source of jobs
-  context.actorOf(InputSource(router), "inputSource")
+  context.actorOf(InputSource(master), "inputSource")
 
   override def receive = Actor.emptyBehavior
 }
