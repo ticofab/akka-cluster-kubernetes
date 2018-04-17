@@ -44,32 +44,3 @@ dockerBaseImage := "openjdk:8-jre"
 defaultLinuxInstallLocation in Docker := s"/opt/${name.value}" // to have consistent directory for files
 dockerRepository := Some("eu.gcr.io")
 
-//universal:packageBin
-
-// deploy:
-// docker:publishLocal
-// gcloud docker -- push eu.gcr.io/adam-akka/akka-cluster-kubernetes:latest
-
-// kubectl get pods (I'll see what is running)
-
-// kubectl apply -f master.yaml (this starts the thing)
-
-// watch kubectl get pods (this devotes one screen to monitoring the pods)
-
-// kubectl logs -f akka-master-0 (see the logs from a pod, also available in stack driver)
-
-// kubectl describe statefulset akka-master
-// kubectl get statefulset akka-worker (this is good to watch)
-// kubectl get statefulset akka-worker -o yaml (this outputs the information in yaml format and more closely reflects the API)
-// kubectl get statefulset akka-worker -o json | jq .status (this is tool to parse json stuff)
-
-// kubectl get services (see ip addresses)
-
-// kubectl delete pod akka-master-0
-
-// stop working:
-// kubectl delete -f master.yaml
-
-// redeploy:
-// kubectl delete statefulset akka-master
-// kubectl apply -f master.yaml

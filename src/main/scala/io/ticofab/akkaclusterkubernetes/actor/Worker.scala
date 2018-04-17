@@ -6,22 +6,13 @@ import io.ticofab.akkaclusterkubernetes.actor.Master.JobCompleted
 
 class Worker extends Actor with ActorLogging {
 
-  log.info(s"creating worker {}", self.path.name)
   val jobsMillis = 1000 / Worker.jobsRatePerSecond
-
-  // starts a little server to serve an "alive" endpoint
-  //  implicit val as = context.system
-  //  implicit val am = ActorMaterializer()
-  //  val routes = get {
-  //    println(s"worker ${self.path.name} got an alive request" )
-  //    complete(s"Akka Cluster Kubernetes, worker ${self.path.name} is alive!\n")
-  //  }
-  //  Http().bindAndHandle(routes, "0.0.0.0", 8080)
+  log.info(s"creating worker {}, each job will take {} millis.", self.path.name, jobsMillis)
 
   override def receive = {
 
     case job: Job =>
-      log.debug("{}, received job {}", self.path.name, job.number)
+      log.debug("worker {}, received job {}", self.path.name, job.number)
 
       // Simulate a CPU-intensive workload that takes ~2000 milliseconds
       val start = System.currentTimeMillis()

@@ -8,8 +8,6 @@ import io.ticofab.akkaclusterkubernetes.config.Config
 
 import scala.collection.JavaConverters
 
-// TODO: provide some readiness probe
-
 /**
   * This guy knows the K8S ways, while the rest of the app is K8S-agnostic.
   */

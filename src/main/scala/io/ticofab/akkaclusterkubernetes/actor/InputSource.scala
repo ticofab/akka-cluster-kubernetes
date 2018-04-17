@@ -18,7 +18,7 @@ import scala.concurrent.duration._
   */
 class InputSource(target: ActorRef) extends Actor with ActorLogging {
 
-  log.info("input source starting, target it {}", target.path.name)
+  log.info("input source starting, target is {}", target.path.name)
 
   implicit val as = context.system
   var counter = 0

@@ -20,7 +20,7 @@ class Supervisor extends Actor with ActorLogging {
     if (Config.kubernetes.`use-kubernetes`) context.actorOf(KubernetesController(), "k8s-controller")
     else context.actorOf(Props(new DummyScalingController))
 
-  // da master
+  // the master
   val master = context.actorOf(Master(scalingController), "master")
 
   // the tunable source of jobs

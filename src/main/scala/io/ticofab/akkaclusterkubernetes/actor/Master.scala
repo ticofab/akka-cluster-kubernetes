@@ -94,7 +94,9 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   workers power:                          {}", workerPoolPower)
       log.debug("   arrived vs power difference:            {}", difference)
       log.debug("   possible to take action:                {}", possibleToTakeAction)
-      //log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
+
+      // uncommenting the next line output logs in a CSV-friendly format
+      // log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
 
       if (possibleToTakeAction) {
 
