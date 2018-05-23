@@ -28,7 +28,7 @@ class KubernetesController extends Actor with ActorLogging {
 
     case AddNode =>
 
-      log.debug("AddNode")
+      // log.debug("AddNode")
 
       val workers = client.extensions.deployments.withName(workerDeploymentName)
 
@@ -39,7 +39,7 @@ class KubernetesController extends Actor with ActorLogging {
         val currentReplicas = workers.get.getSpec.getReplicas
 
         if ((currentReplicas + 1) < Config.kubernetes.`max-replicas`) {
-          log.debug(s"We currently have {}, scaling up Deployment $workerDeploymentName to {} replicas", currentReplicas, currentReplicas + 1)
+          log.debug(s"We currently have {} nodes, scaling up Deployment $workerDeploymentName to {} replicas", currentReplicas, currentReplicas + 1)
           workers.scale(currentReplicas + 1)
         } else {
           log.debug("Can't scale up. Reached maximum number of {} replicas.", currentReplicas)
@@ -60,7 +60,7 @@ class KubernetesController extends Actor with ActorLogging {
       }
 
     case RemoveNode =>
-      log.debug("RemoveNode")
+      // log.debug("RemoveNode")
 
       val workers = client.extensions.deployments.withName(workerDeploymentName)
 

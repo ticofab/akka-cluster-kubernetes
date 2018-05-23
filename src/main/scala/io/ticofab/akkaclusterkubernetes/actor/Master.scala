@@ -87,16 +87,15 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
       val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds actionInterval)
 
       log.debug("evaluating rate:")
-      log.debug("   time:                                   {}", now.toString)
-      log.debug("   waiting jobs:                           {}", waitingJobs.size)
-      log.debug("   jobs arrived in window                  {}", jobsArrivedInWindow.size)
-      log.debug("   arrivedCompletedDelta                   {}", arrivedCompletedDelta)
-      log.debug("   jobs completed in window:               {}", jobsCompletedInWindows.size)
-      log.debug("   workers amount:                         {}", workers)
-      log.debug("   workers power:                          {}", workerPoolPower)
-      log.debug("   arrived vs power difference:            {}", difference)
-      log.debug("   possible to take action:                {}", possibleToTakeAction)
-
+      log.debug("   queue size:                {}", waitingJobs.size)
+      log.debug("   workers amount:            {}", workers)
+      log.debug("   burndown rate              {}", difference)
+      // log.debug("   time:                      {}", now.toString)
+      // log.debug("   jobs arrived in window     {}", jobsArrivedInWindow.size)
+      // log.debug("   arrivedCompletedDelta      {}", arrivedCompletedDelta)
+      // log.debug("   jobs completed in window:  {}", jobsCompletedInWindows.size)
+      // log.debug("   workers power:             {}", workerPoolPower)
+      // log.debug("   possible to take action:   {}", possibleToTakeAction)
       // uncommenting the next line output logs in a CSV-friendly format
       //      log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size +
       //        "," + arrivedCompletedDelta + "," + workers + "," + workerPoolPower)
@@ -107,7 +106,7 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
 
           // we are receiving more jobs than we can handle.
 
-          log.debug("we need more power, add node")
+          log.debug("   we need more power, add node")
           scalingController ! AddNode
           lastActionTaken = now
 
@@ -117,12 +116,12 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
 
           // but do we have older jobs to burn?
           if (waitingJobs.size > singleWorkerPower) {
-            log.debug("we're burning as much as we receive, but we have a long queue. add worker.")
+            log.debug("   we're burning as much as we receive, but we have a long queue. add worker.")
             scalingController ! AddNode
             lastActionTaken = now
           } else {
             // it seems we're at a perfect balance!
-            log.debug("we're burning as much as we receive, and it seems we don't need more power. Excellent!.")
+            log.debug("   we're burning as much as we receive, and it seems we don't need more power. Excellent!.")
           }
 
         } else if (difference < 0) {
@@ -135,9 +134,9 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
 
             // did we strike a balance or do we have too much power?
             if (Math.abs(difference) <= singleWorkerPower) {
-              log.debug("we have a little more processing power than we need. stay like this.")
+              log.debug("   we have a little more processing power than we need. stay like this.")
             } else {
-              log.debug("we have too much power for what we need. remove worker")
+              log.debug("   we have too much power for what we need. remove worker")
               scalingController ! RemoveNode
               lastActionTaken = now
             }
@@ -149,12 +148,12 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
             // are we burning fast enough?
             if (waitingJobs.size > singleWorkerPower * 4) {
 
-              log.debug("we are burning the old queue but not fast enough. add worker.")
+              log.debug("   we are burning the old queue but not fast enough. add worker.")
               scalingController ! AddNode
               lastActionTaken = now
 
             } else {
-              log.debug("we have more power than we need but still burning down old jobs. stay like this.")
+              log.debug("   we have more power than we need but still burning down old jobs. stay like this.")
             }
 
           }
