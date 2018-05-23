@@ -8,7 +8,7 @@ import akka.cluster.routing.ClusterRouterPool
 import akka.cluster.{Cluster, routing}
 import akka.routing.RoundRobinPool
 import akka.stream.ActorMaterializer
-import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
+import io.ticofab.akkaclusterkubernetes.actor.JobSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Master.{EvaluateRate, JobCompleted}
 import io.ticofab.akkaclusterkubernetes.actor.scaling.{AddNode, RemoveNode}
 
@@ -46,11 +46,13 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
       })
 
   val evaluationWindow = 10.seconds
+  val actionInterval = evaluationWindow.toSeconds * 2
   val singleWorkerPower = (Worker.jobsRatePerSecond * evaluationWindow.toSeconds).toInt
   context.system.scheduler.schedule(evaluationWindow, evaluationWindow, self, EvaluateRate)
 
+  // initial value of last action taken, simulating it happened in the past
+  var lastActionTaken: LocalDateTime = LocalDateTime.now minusSeconds 60
   var workers: Int = 0
-  var lastActionTaken: LocalDateTime = LocalDateTime.now minusSeconds (evaluationWindow.toSeconds * 3)
 
   override def receive: Receive = {
 
@@ -82,7 +84,7 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
 
       val workerPoolPower = singleWorkerPower * workers
       val difference = jobsArrivedInWindow.size - workerPoolPower
-      val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds (evaluationWindow.toSeconds * 3))
+      val possibleToTakeAction = now isAfter (lastActionTaken plusSeconds actionInterval)
 
       log.debug("evaluating rate:")
       log.debug("   time:                                   {}", now.toString)
@@ -96,7 +98,8 @@ class Master(scalingController: ActorRef) extends Actor with ActorLogging {
       log.debug("   possible to take action:                {}", possibleToTakeAction)
 
       // uncommenting the next line output logs in a CSV-friendly format
-      // log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size + "," + arrivedCompletedDelta + "," + workers)
+      //      log.debug("   csv {}", now.toString + "," + waitingJobs.size / 10 + "," + jobsArrivedInWindow.size +
+      //        "," + arrivedCompletedDelta + "," + workers + "," + workerPoolPower)
 
       if (possibleToTakeAction) {
 

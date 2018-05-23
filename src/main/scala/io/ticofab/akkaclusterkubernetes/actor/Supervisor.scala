@@ -24,7 +24,7 @@ class Supervisor extends Actor with ActorLogging {
   val master = context.actorOf(Master(scalingController), "master")
 
   // the tunable source of jobs
-  context.actorOf(InputSource(master), "inputSource")
+  context.actorOf(JobSource(master), "jobSource")
 
   override def receive = Actor.emptyBehavior
 }

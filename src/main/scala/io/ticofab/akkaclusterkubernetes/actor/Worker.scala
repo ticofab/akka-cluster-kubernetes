@@ -1,7 +1,7 @@
 package io.ticofab.akkaclusterkubernetes.actor
 
 import akka.actor.{Actor, ActorLogging, Props}
-import io.ticofab.akkaclusterkubernetes.actor.InputSource.Job
+import io.ticofab.akkaclusterkubernetes.actor.JobSource.Job
 import io.ticofab.akkaclusterkubernetes.actor.Master.JobCompleted
 
 class Worker extends Actor with ActorLogging {
@@ -26,5 +26,6 @@ class Worker extends Actor with ActorLogging {
 object Worker {
   def apply(): Props = Props(new Worker)
 
-  val jobsRatePerSecond = 0.5
+  // how many jobs are completed in a second?
+  val jobsRatePerSecond = 1
 }
