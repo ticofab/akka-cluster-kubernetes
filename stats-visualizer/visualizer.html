@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="connect-src * 'unsafe-inline';">
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="chart.js"></script>
+    <script src="wsscript.js"></script>
+</head>
+<body>
+<button onclick="openWSConnection('ws', '0.0.0.0', '8080', '/stats')">Connect</button><br>
+<button onclick="randomDrawChart()">Draw</button>
+<!--Div that will hold the pie chart-->
+<div id="curve_chart" style="width: 1800px; height: 1200px"></div>
+</body>
+</html>
