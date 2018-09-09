@@ -22,3 +22,14 @@ libraryDependencies ++= {
     "io.fabric8" % "kubernetes-api" % "3.0.8"
   )
 }
+
+enablePlugins(JavaAppPackaging)
+enablePlugins(AshScriptPlugin)
+
+mainClass in Compile := Some("io.ticofab.akkaclusterkubernetes.AkkaClusterKubernetesMasterApp")
+packageName in Docker := "adam-akka/" + name.value
+version in Docker := "latest"
+dockerLabels := Map("maintainer" -> organization.value, "version" -> version.value)
+dockerBaseImage := "openjdk:8-jre"
+defaultLinuxInstallLocation in Docker := s"/opt/${name.value}" // to have consistent directory for files
+dockerRepository := Some("eu.gcr.io")

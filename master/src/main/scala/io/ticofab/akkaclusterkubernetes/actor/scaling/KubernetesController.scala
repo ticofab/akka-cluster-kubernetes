@@ -19,9 +19,7 @@ class KubernetesController extends Actor with CustomLogSupport {
 
   override def postStop(): Unit = {
     super.postStop()
-
     info(logJson("Stopping controller - deleting all workers"))
-
     client.extensions().deployments().withName(workerDeploymentName).delete()
   }
 
@@ -69,11 +67,8 @@ class KubernetesController extends Actor with CustomLogSupport {
         val replicas = workers.get.getSpec.getReplicas - 1
 
         if (replicas >= 1) {
-
           info(logJson(s"Scaling down Deployment $workerDeploymentName to $replicas replicas"))
-
           workers.scale(replicas)
-
         } else {
           info(logJson("Only one replica remains in the Deployment - not scaling down"))
         }
