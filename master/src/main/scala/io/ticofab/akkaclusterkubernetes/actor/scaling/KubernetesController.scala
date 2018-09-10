@@ -86,7 +86,6 @@ class KubernetesController extends Actor with CustomLogSupport {
     val role = "worker"
     val envVars = JavaConverters.seqAsJavaList(
       List[EnvVar](
-        new EnvVarBuilder().withName("ROLE").withValue(role).build(),
         new EnvVarBuilder().withName("POD_IP").withNewValueFrom().withFieldRef(
           new ObjectFieldSelectorBuilder().withFieldPath("status.podIP").build()).endValueFrom().build()))
 
@@ -95,7 +94,7 @@ class KubernetesController extends Actor with CustomLogSupport {
     val containerPort = new ContainerPortBuilder().withContainerPort(2551).build()
 
     val container = new ContainerBuilder()
-      .withName(s"akka-$role")
+      .withName(s"$role")
       .withImage(System.getenv("WORKER_IMAGE"))
       .withImagePullPolicy("Always")
       .withEnv(envVars)
