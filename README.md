@@ -16,9 +16,9 @@ Upload the image to your Kubernetes project:
 
 ```gcloud docker -- push <your_project>:latest```
 
-Start the master node with:
+From the `k8s-deployment` folder, start the whole thing with:
 
-```kubectl apply -f master.yaml```
+```kubectl apply -f service.yaml```
 
 Now you can access nodes' logs. When done, shut down:
 
