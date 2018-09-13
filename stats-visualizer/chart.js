@@ -10,10 +10,10 @@ function drawChart(input) {
     const options = {
         legend: {position: 'bottom'},
         vAxis: {
-            ticks: [-20, 0, 20, 40, 60, 80],
+            ticks: [-20, 0, 20, 40],
             viewWindow: {
                 min: -20,
-                max: 80
+                max: 40
             }
         },
         hAxis: {

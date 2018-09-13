@@ -19,7 +19,7 @@ function openWSConnection(protocol, hostname, port, endpoint) {
             const wsMsg = JSON.parse(messageEvent.data);
             const values = [
                 new Date(Number(wsMsg.time) * 1000),
-                wsMsg.queueSize / 5,
+                wsMsg.queueSize / 2,
                 wsMsg.workersAmount,
                 wsMsg.burndownRate,
                 wsMsg.jobsArrivedInWindow
