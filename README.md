@@ -6,6 +6,8 @@ Elasticity is the ability of a system to scale its resources up and down accordi
 
 We combine custom resource metrics with logic to automatically adjust the configuration of the underlying cloud infrastructure.    
 
+An alternative example of cluster formation is in my other project [CloudMatch](https://github.com/ticofab/cloudmatch), which uses the `Akka Cluster Bootstrap - Kubernetes API` module for Akka.
+
 ## Usage
 
 First, package the app localy in a Docker container:
